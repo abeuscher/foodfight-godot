@@ -1,0 +1,361 @@
+[gd_scene load_steps=3 format=3 uid="uid://main_game"]
+
+[ext_resource type="Script" path="res://scripts/components/island_grid_view.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/main/game.gd" id="2"]
+
+[node name="Game" type="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.12, 1)
+
+[node name="MainLayout" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -36.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="LeftPanel" type="PanelContainer" parent="MainLayout"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+
+[node name="LeftPanelMargin" type="MarginContainer" parent="MainLayout/LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="LeftPanelVBox" type="VBoxContainer" parent="MainLayout/LeftPanel/LeftPanelMargin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ToolbarLabel" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
+layout_mode = 2
+text = "BUILD"
+horizontal_alignment = 1
+
+[node name="ToolbarContainer" type="VBoxContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/separation = 2
+
+[node name="BtnBase" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "Base"
+
+[node name="Sep1" type="HSeparator" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnCannon" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "HD $5"
+
+[node name="BtnCondiment" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "CS $10"
+
+[node name="BtnInterceptor" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "VC $5"
+
+[node name="BtnRadar" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "CR $10"
+
+[node name="BtnLemonade" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "LS $20"
+
+[node name="BtnSalad" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "SB $20"
+
+[node name="BtnJammer" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+toggle_mode = true
+text = "RJ $15"
+
+[node name="Sep2" type="HSeparator" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnUndo" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+text = "Undo"
+
+[node name="InfoPanelSpacer" type="Control" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InfoPanel" type="PanelContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(144, 100)
+layout_mode = 2
+size_flags_vertical = 8
+
+[node name="InfoMargin" type="MarginContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="InfoVBox" type="VBoxContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin/InfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+clip_text = true
+
+[node name="InfoDescription" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin/InfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = ""
+autowrap_mode = 2
+clip_text = true
+
+[node name="GameArea" type="VBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TopBar" type="HBoxContainer" parent="MainLayout/GameArea"]
+layout_mode = 2
+alignment = 1
+
+[node name="RoundLabel" type="Label" parent="MainLayout/GameArea/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Round 1 - Placement"
+horizontal_alignment = 1
+
+[node name="BattlefieldCenter" type="CenterContainer" parent="MainLayout/GameArea"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BattlefieldContainer" type="HBoxContainer" parent="MainLayout/GameArea/BattlefieldCenter"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="PlayerIsland" type="VBoxContainer" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="PlayerLabel" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/PlayerIsland"]
+layout_mode = 2
+text = "YOUR ISLAND"
+horizontal_alignment = 1
+
+[node name="PlayerMoney" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/PlayerIsland"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "$10"
+horizontal_alignment = 1
+
+[node name="PlayerGrid" type="Control" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/PlayerIsland"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(512, 512)
+layout_mode = 2
+size_flags_horizontal = 4
+script = ExtResource("1")
+cell_size = Vector2(16, 16)
+
+[node name="Canal" type="ColorRect" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 512)
+layout_mode = 2
+color = Color(0.15, 0.2, 0.35, 1)
+
+[node name="CanalLabel" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/Canal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "CANAL"
+horizontal_alignment = 1
+
+[node name="EnemyIsland" type="VBoxContainer" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="EnemyLabel" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/EnemyIsland"]
+layout_mode = 2
+text = "ENEMY ISLAND"
+horizontal_alignment = 1
+
+[node name="EnemyMoney" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/EnemyIsland"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "$10"
+horizontal_alignment = 1
+
+[node name="EnemyGrid" type="Control" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/EnemyIsland"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(512, 512)
+layout_mode = 2
+size_flags_horizontal = 4
+script = ExtResource("1")
+cell_size = Vector2(16, 16)
+
+[node name="StatusLabel" type="Label" parent="MainLayout/GameArea"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Select a structure type, then click to place"
+horizontal_alignment = 1
+
+[node name="BottomPanel" type="HBoxContainer" parent="MainLayout/GameArea"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 40
+
+[node name="BtnEndTurn" type="Button" parent="MainLayout/GameArea/BottomPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 40)
+layout_mode = 2
+text = "End Placement"
+
+[node name="DevToolbar" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -32.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 8
+
+[node name="DevLabel" type="Label" parent="DevToolbar"]
+layout_mode = 2
+text = "DEV:"
+
+[node name="BtnToggleFog" type="Button" parent="DevToolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "Fog: ON"
+
+[node name="BtnRestart" type="Button" parent="DevToolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Restart"
+
+[node name="SlateLayer" type="CanvasLayer" parent="."]
+layer = 100
+
+[node name="Slate" type="ColorRect" parent="SlateLayer"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.05, 0.05, 0.08, 0.95)
+
+[node name="SlateContent" type="VBoxContainer" parent="SlateLayer/Slate"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -80.0
+offset_right = 200.0
+offset_bottom = 80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="SlateTitle" type="Label" parent="SlateLayer/Slate/SlateContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "ROUND 1"
+horizontal_alignment = 1
+
+[node name="SlateSubtitle" type="Label" parent="SlateLayer/Slate/SlateContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Placement Phase"
+horizontal_alignment = 1
+
+[node name="BtnSlateContinue" type="Button" parent="SlateLayer/Slate/SlateContent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Continue"
+
+[node name="BtnSlateReset" type="Button" parent="SlateLayer/Slate/SlateContent"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Play Again"

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gdir=res://test/unit -gexit)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_island_grid.gd -gexit)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_island_grid_view.gd -gexit)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_structure.gd -gexit)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_placement_manager.gd -gexit)",
+      "Bash(\"C:/Godot/Godot_v4.5.1-stable_win64_console.exe\" --path \"E:/FoodFightIslandv0.1\" -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_targeting_manager.gd -gexit)",
+      "Bash(godot:*)"
+    ]
+  }
+}
