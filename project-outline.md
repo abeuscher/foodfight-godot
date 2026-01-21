@@ -1,6 +1,11 @@
 # Food Fight Island - Development Roadmap
 
-This document outlines the phased development plan for the prototype, designed for incremental implementation with Claude Code. Each phase builds on the previous, with automated GUT tests validating logic and manual engagement checks validating feel.
+This document outlines the phased development plan for the prototype, designed for incremental implementation with Claude Code. Each phase builds on the previous, with automated GUT tests validating logic and manual playtesting validating balance and engagement.
+
+**Development Priority Order:**
+1. **Gameplay & Balance** (Current Focus) - Phases 0-9
+2. **AI Opponent** - Phase 10
+3. **Graphics & Views** - Phase 11-12
 
 ---
 
@@ -14,14 +19,16 @@ Each step that generates new code includes GUT unit tests to verify correctness.
 ### Engagement Checkpoints
 Marked with `[ENGAGE]` - these require running the game and manually verifying the interaction *feels* satisfying. Per the readme philosophy: if it doesn't feel good, we iterate before moving forward.
 
+### Balance Checkpoints
+Marked with `[BALANCE]` - these require multiple playthroughs testing specific unit combinations and strategies. Document findings in `balance-notes.md`.
+
 ---
 
-## Phase 0: Project Foundation
+## Phase 0: Project Foundation [COMPLETED]
 
 **Goal:** Establish project structure, testing infrastructure, and baseline scene.
 
 ### Step 0.1: Directory Structure
-Create the folder hierarchy:
 ```
 res://
 ├── addons/gut/          # GUT testing framework
@@ -43,611 +50,507 @@ res://
 └── project.godot
 ```
 
-**Test:** Directory structure exists, GUT addon installed.
-
 ### Step 0.2: GUT Installation & Configuration
-- Install GUT addon (v9.x for Godot 4)
-- Create `test/gut_runner.tscn` for running tests
-- Create a sample test to verify framework works
-
-**Test:** Run `test_example.gd` - should pass with green output.
+- GUT addon installed (v9.x for Godot 4)
+- `test/gut_runner.tscn` created for running tests
 
 ### Step 0.3: Game Manager Autoload
-Create `GameManager` singleton to track:
-- Current game state (PLANNING, EXECUTING, GAME_OVER)
+`GameManager` singleton tracks:
+- Current game phase (BASE_PLACEMENT, PLACEMENT, TARGETING, FIGHT, GAME_OVER)
 - Turn counter
 - Win/lose status
 
-**Test:** `test_game_manager.gd`
-- [ ] State transitions work correctly
-- [ ] Turn counter increments
-- [ ] Win/lose flags set properly
-
 ---
 
-## Phase 1: The Grid (Foundational Interaction)
+## Phase 1: The Grid [COMPLETED]
 
-**Goal:** A clickable grid that responds to input. This is the atomic interaction everything else builds on.
+**Goal:** A clickable grid that responds to input.
 
 ### Step 1.1: Grid Data Structure
-Create `IslandGrid` class:
+`IslandGrid` class with:
 - 2D array representing cells
 - Cell states: EMPTY, OCCUPIED, BLOCKED
 - Methods: `get_cell()`, `set_cell()`, `is_valid_position()`
 
-**Test:** `test_island_grid.gd`
-- [ ] Grid initializes with correct dimensions
-- [ ] get/set cell works
-- [ ] is_valid_position returns correct values
-- [ ] Out-of-bounds access handled gracefully
-
 ### Step 1.2: Grid Visualization
-Create `IslandGridView` scene:
+`IslandGridView` scene:
 - Draws grid lines
 - Renders cell backgrounds based on state
 - Configurable cell size and grid dimensions
 
-**Test:** `test_island_grid_view.gd`
-- [ ] Grid renders with correct number of cells
-- [ ] Cell size matches configuration
-- [ ] Grid updates when data changes
-
 ### Step 1.3: Grid Input Handling
-Add to `IslandGridView`:
 - Mouse hover highlights current cell
 - Click emits `cell_clicked(grid_pos)` signal
 - Visual feedback on hover/click
 
-**Test:** `test_grid_input.gd`
-- [ ] Mouse position converts to correct grid coordinates
-- [ ] Signal emits with correct position
-- [ ] Invalid positions (outside grid) ignored
-
-**[ENGAGE] Checkpoint 1.3:** Run the game with just the grid. Does clicking cells feel responsive? Is the hover feedback satisfying? Adjust timing/colors until it feels good.
-
 ---
 
-## Phase 2: Structure Placement (First Real Interaction)
+## Phase 2: Structure Placement [COMPLETED]
 
 **Goal:** Player can place structures on the grid with satisfying feedback.
 
 ### Step 2.1: Structure Base Class
-Create `Structure` resource/class:
-- Properties: `structure_type`, `attack_priority`, `health`, `grid_position`
-- Types enum: HQ, CONDIMENT_CANNON, PICKLE_INTERCEPTOR
+`Structure` resource with:
+- Properties: `type`, `health`, `max_health`, `attack_priority`, `attack_damage`
+- Additional properties: `interception_range`, `area_attack_radius`, `income_per_turn`, `heal_radius`, `heal_amount`, `radar_range`, `jam_radius`
+- Jamming state: `is_jammed`, `jam_turns_remaining`
 
-**Test:** `test_structure.gd`
-- [ ] Structure initializes with correct defaults
-- [ ] Properties are readable/writable
-- [ ] Attack priority ordering works
-
-### Step 2.2: Structure Scenes
-Create scenes for each structure type:
-- `headquarters.tscn`
-- `condiment_cannon.tscn`
-- `pickle_interceptor.tscn`
-
-Each has:
-- Sprite placeholder (colored rectangle for now)
-- Structure script attached
-
-**Test:** `test_structure_scenes.gd`
-- [ ] Each scene instantiates without error
-- [ ] Structure data accessible from scene
+### Step 2.2: Structure Types
+```
+Type Enum: BASE, HOT_DOG_CANNON, CONDIMENT_CANNON, CONDIMENT_STATION,
+           PICKLE_INTERCEPTOR, COFFEE_RADAR, VEGGIE_CANNON,
+           LEMONADE_STAND, SALAD_BAR, RADAR_JAMMER
+```
 
 ### Step 2.3: Placement System
-Create `PlacementManager`:
-- Tracks currently selected structure type (for placing)
+`PlacementManager`:
+- Tracks structures placed on grid
 - Validates placement (cell empty, within bounds)
-- Places structure on grid and updates grid data
-- Emits `structure_placed(structure, position)` signal
+- Emits placement signals
 
-**Test:** `test_placement_manager.gd`
-- [ ] Cannot place on occupied cell
-- [ ] Cannot place outside grid
-- [ ] Placement updates grid state
-- [ ] Signal emits correctly
-
-### Step 2.4: Placement Visuals & Feedback
-- Ghost preview of structure follows cursor when placing
+### Step 2.4: Placement Visuals
+- Ghost preview follows cursor
 - Invalid positions show red tint
-- Placement has visual/audio pop (even placeholder sound)
-
-**Test:** `test_placement_visuals.gd`
-- [ ] Preview appears when placement mode active
-- [ ] Preview position updates with mouse
-- [ ] Invalid indicator shows correctly
-
-**[ENGAGE] Checkpoint 2.4:** Place several structures. Does the ghost preview feel right? Is there enough feedback on successful placement? Does invalid placement communicate clearly? Iterate until placing structures is satisfying.
 
 ---
 
-## Phase 3: Target Assignment
+## Phase 3: Target Assignment [COMPLETED]
 
 **Goal:** Player can aim offensive structures at enemy positions.
 
 ### Step 3.1: Two-Island Map Layout
-Create main game scene with:
 - Player island (left)
 - Enemy island (right)
-- Canal/gap between them
-- Camera showing both
-
-**Test:** `test_map_layout.gd`
-- [ ] Both grids instantiate
-- [ ] Grids positioned correctly relative to each other
-- [ ] Camera encompasses both islands
+- Canal/gap between them (height scales with grid size)
 
 ### Step 3.2: Targeting System
-Create `TargetingManager`:
-- Select an offensive structure
+`TargetingManager`:
+- Select offensive structure
 - Click enemy grid to assign target
-- Store target assignments: `Dictionary[Structure, Vector2i]`
-- Visual line/indicator showing current target
+- Store assignments: `Dictionary[Structure, Vector2i]`
+- Visual targeting lines
 
-**Test:** `test_targeting_manager.gd`
-- [ ] Only offensive structures can be selected for targeting
-- [ ] Target must be valid enemy grid position
-- [ ] Target assignment stored correctly
-- [ ] Can reassign target
-
-### Step 3.3: Targeting UI
-- Click own offensive structure to select it
-- Selected structure highlighted
-- Click enemy cell to assign target
-- Line drawn from structure to target
-- Right-click or ESC to deselect
-
-**Test:** `test_targeting_ui.gd`
-- [ ] Selection highlight visible
-- [ ] Target line renders correctly
-- [ ] Deselection clears visuals
-
-**[ENGAGE] Checkpoint 3.3:** Select a cannon and assign targets. Does the selection feel clear? Is the targeting line satisfying? Does the flow of select-then-target feel natural?
+### Step 3.3: Fog of War
+- Enemy cells start hidden
+- Missiles reveal cells along flight path
+- Revealed cells persist between turns
+- Dev toggle to disable fog for testing
 
 ---
 
-## Phase 4: Turn Execution (The Payoff)
+## Phase 4: Turn Execution [COMPLETED]
 
-**Goal:** Watch your programmed attacks resolve. This is the core "program then watch" satisfaction.
+**Goal:** Watch programmed attacks resolve with satisfying feedback.
 
-### Step 4.1: End Turn Button & State Transition
-- UI button to end planning phase
-- Transitions GameManager to EXECUTING state
-- Locks player input during execution
-
-**Test:** `test_turn_flow.gd`
-- [ ] Button triggers state change
-- [ ] Input disabled during execution
-- [ ] State returns to PLANNING after execution
+### Step 4.1: Turn Flow
+Game phases: BASE_PLACEMENT → PLACEMENT → TARGETING → FIGHT
+- End phase button transitions between phases
+- Auto-advance when conditions met (e.g., all bases placed)
 
 ### Step 4.2: Execution Queue
-Create `ExecutionManager`:
-- Collects all structures with targets (both sides)
+`ExecutionManager`:
+- Collects all structures with targets
 - Sorts by attack priority (highest first)
 - Processes queue sequentially
 
-**Test:** `test_execution_queue.gd`
-- [ ] Structures sorted by priority correctly
-- [ ] Higher priority executes first
-- [ ] Destroyed structures removed from queue
-
 ### Step 4.3: Projectile System
-Create `Projectile` scene:
-- Travels from source to target position
+- Projectiles travel from source to target
 - Configurable speed
-- Emits `arrived(target_pos)` signal
-
-**Test:** `test_projectile.gd`
-- [ ] Projectile moves toward target
-- [ ] Signal emits on arrival
-- [ ] Projectile removed after arrival
+- Emits arrival signal
 
 ### Step 4.4: Hit Resolution
-When projectile arrives:
-- Check if target cell has structure
-- If yes, apply damage
-- If structure health <= 0, destroy it
-- Visual feedback (hit marker, destruction effect)
-
-**Test:** `test_hit_resolution.gd`
-- [ ] Hit on structure deals damage
-- [ ] Structure destroyed at 0 health
-- [ ] Miss on empty cell handled
-- [ ] Destroyed structure removed from grid
-
-### Step 4.5: Execution Pacing
-- Delay between each action for readability
-- Camera follows action (optional)
-- Clear visual separation between attacks
-
-**Test:** `test_execution_pacing.gd`
-- [ ] Configurable delay between actions
-- [ ] Actions don't overlap
-
-**[ENGAGE] Checkpoint 4.5:** End a turn and watch execution. Is the pacing right? Can you follow what's happening? Is there tension as projectiles fly? Is there satisfaction when they hit? This is the critical engagement moment - iterate heavily here.
+- Check target cell for structures
+- Apply damage to all structures in area (based on `area_attack_radius`)
+- Destroy structures at 0 health
 
 ---
 
-## Phase 5: Arsenal Expansion
+## Phase 5: Arsenal Expansion [COMPLETED]
 
-**Goal:** Scale up the battlefield, add economic depth, fog of war, and a diverse arsenal of food-themed weapons and support structures.
+**Goal:** Diverse arsenal of food-themed weapons and support structures.
 
-### Step 5.1: Larger Grid (32x32)
-Expand islands from 6x4 to 32x32:
-- Update `IslandGrid` to support configurable dimensions
-- Update `IslandGridView` with scrolling/panning or zoom
-- Adjust cell size for visibility at larger scale
-- Add minimap (optional) for navigation
+### Current Structure Stats (All structures have 5+ HP)
 
-**Test:** `test_large_grid.gd`
-- [ ] 32x32 grid initializes correctly
-- [ ] Performance acceptable with 1024 cells
-- [ ] Navigation/scrolling works smoothly
+| Structure | Cost | HP | Special |
+|-----------|------|-----|---------|
+| Base | Free | 5 | Critical - lose all 3 to lose game |
+| Hot Dog Cannon | $5 | 5 | 1 dmg, 3x3 area |
+| Condiment Cannon | $5 | 5 | 1 dmg, 3x3 area |
+| Condiment Station | $10 | 5 | 1 dmg, 3x3 area |
+| Pickle Interceptor | $5 | 5 | Defensive, requires radar |
+| Coffee Radar | $10 | 5 | 20-block detection, +5% intercept chance |
+| Veggie Cannon | $5 | 5 | Defensive, requires radar |
+| Lemonade Stand | $20 | 5 | $5 passive income/turn |
+| Salad Bar | $20 | 5 | Heals 1 HP/turn in 3x3 area |
+| Radar Jammer | $15 | 5 | Jams radar for 3 turns, cannot be intercepted |
 
-### Step 5.2: Economy System
-Implement currency mechanics:
-- Player starts with $10
-- EconomyManager singleton tracks money
-- Structures have costs (see structure list below)
-- Earning money: $5 per 1 HP damage dealt to enemy
-- UI displays current money
+### Step 5.1: Economy System
+- Player starts with $30
+- Enemy has fixed arsenal (no economy)
+- $5 earned per HP damage dealt (player only)
+- Lemonade Stands generate passive income
 
-**Test:** `test_economy.gd`
-- [ ] Starting money is $10
-- [ ] Structure purchase deducts money
-- [ ] Cannot purchase if insufficient funds
-- [ ] Damage dealt awards money correctly
-
-### Step 5.3: Fog of War
-Enemy island visibility system:
-- Island landmass outline always visible
-- Individual cells start hidden (fog)
-- Missiles reveal cells as they pass over
-- Revealed cells stay visible permanently
-- FogManager tracks revealed positions per side
-
-**Test:** `test_fog_of_war.gd`
-- [ ] Enemy cells start fogged
-- [ ] Missile path reveals cells
-- [ ] Revealed cells persist between turns
-- [ ] Player island not fogged for player
-
-### Step 5.4: Multiple Bases
-Replace single HQ with 3 bases:
-- Each player places 3 bases (free cost)
-- Game ends when ALL 3 bases destroyed for either side
-- Bases have moderate health (3 HP each)
-- Update win/lose detection for multi-base logic
-
-**Test:** `test_multi_base.gd`
-- [ ] Each player has 3 bases
-- [ ] Game continues if 1-2 bases destroyed
-- [ ] Game ends when all 3 bases destroyed
-- [ ] Correct winner determined
-
-### Step 5.5: Structure - Hot Dog Cannon
-Offensive weapon ($5):
-- Single projectile, hits one square for 1 HP
-- Upgradable: Double Dog ($5), Triple Dog Dare ($5)
-- Upgrades add additional projectiles
-- Reveals fog along projectile path
-
-**Test:** `test_hot_dog_cannon.gd`
-- [ ] Base cannon fires single projectile
-- [ ] Upgrade increases projectile count
-- [ ] Each projectile deals 1 HP damage
-- [ ] Path reveals fog cells
-
-### Step 5.6: Structure - Condiment Station
-Area attack weapon ($10):
-- Fires mustard blob hitting 3x3 area
-- All structures in area take 1 HP damage
-- Visual: expanding splash effect
-
-**Test:** `test_condiment_station.gd`
-- [ ] Attack hits 3x3 area
-- [ ] All structures in area damaged
-- [ ] Correct damage amount applied
-
-### Step 5.7: Structure - Coffee Cup Radar
-Detection support ($10):
-- Detects inbound missiles
-- Provides targeting data to nearby Veggie Cannons
-- Detection range: configurable radius
-- Visual: radar sweep effect during execution
-
-**Test:** `test_radar.gd`
-- [ ] Radar detects incoming projectiles in range
-- [ ] Detection data available to defensive structures
-- [ ] No detection if radar destroyed
-
-### Step 5.8: Structure - Veggie Cannon
-Defensive weapon ($5):
-- Requires nearby Coffee Cup Radar to function
-- Percentage chance to intercept based on:
-  - Number of radars in range
-  - Upgrade level of Veggie Cannon
-- Base intercept: 30% with 1 radar, +20% per additional radar
-- Upgradable for better accuracy
-
-**Test:** `test_veggie_cannon.gd`
-- [ ] No interception without radar
-- [ ] Intercept chance scales with radar count
-- [ ] Successful intercept destroys projectile
-- [ ] Failed intercept allows projectile through
-
-### Step 5.9: Structure - Lemonade Stand
-Economy support ($20):
-- Generates $5 per turn
-- Upgradable: +$3 per upgrade level
-- Passive income during planning phase
-
-**Test:** `test_lemonade_stand.gd`
-- [ ] Generates money each turn
-- [ ] Upgrade increases generation
-- [ ] No generation if destroyed
-
-### Step 5.10: Structure - Salad Bar
-Healing support ($20):
-- Heals nearby structures each turn
-- Heal radius: configurable (default 2 tiles)
-- Heal amount: 1 HP per turn to adjacent structures
-- Cannot heal self
-
-**Test:** `test_salad_bar.gd`
-- [ ] Heals structures in range
-- [ ] Does not heal self
-- [ ] Respects max health cap
-- [ ] No healing if destroyed
-
-### Step 5.11: Structure Registry & UI
-Unified structure management:
-- StructureRegistry: defines all structure types, costs, stats
-- Build menu UI showing available structures with costs
-- Greyed out structures if insufficient funds
-- Tooltip showing structure details
-
-**Test:** `test_structure_registry.gd`
-- [ ] All structures registered with correct stats
-- [ ] Cost lookup works
-- [ ] UI reflects available funds
-
-**[ENGAGE] Checkpoint 5.11:** Build a diverse base using multiple structure types. Does the economy feel balanced? Is fog of war adding tension? Do the new weapons feel distinct and useful? Can you form strategies around radar + veggie cannon combos?
+### Step 5.2: Multiple Bases
+- Each player places 3 bases (free)
+- Game ends when ALL 3 bases destroyed
+- Base placement phase auto-ends when all bases placed
 
 ---
 
-## Phase 6: Defensive Interception (Refinement)
+## Phase 6: Defensive System [COMPLETED]
 
-**Goal:** Refine the radar-based interception system, making radar essential for defense and adding tactical depth through detection ranges.
+**Goal:** Radar-based interception with tactical depth.
 
-### Core Defensive Behavior
-- **Without Radar:** Defensive towers (Veggie Cannon/Pickle Interceptor) do NOTHING - they cannot detect or intercept missiles
-- **With Radar:** Defensive towers can intercept missiles that are visible to:
-  1. The radar dish itself, OR
-  2. Any defensive tower (Veggie Cannon/Pickle Interceptor) that is within the radar's boost range
-- **Detection Range:** All units (radar and defensive towers) have a detection/visibility radius of 6 blocks in each direction (13x13 area)
-- **Interception Trigger:** When an inbound missile enters the detection range of the radar OR any radar-boosted defensive tower, interception can occur
+### Step 6.1: Interception Mechanics
+- **Base intercept chance:** 50%
+- **Radar bonus:** +5% per active (non-jammed) radar
+- Defensive towers require radar within range to function
+- Intercept point: 70% of missile path (past canal)
 
-### Step 6.1: Detection Range System
-Implement 6-block detection radius:
-- Radar has 6-block detection range (can "see" incoming missiles within 13x13 area centered on radar)
-- Defensive towers have 6-block interception range (can intercept missiles within their area)
-- Defensive towers only activate when within 6 blocks of a radar (radar boost range)
-- Store detection/boost ranges as constants (DETECTION_RANGE = 6)
+### Step 6.2: Radar Jamming
+- Radar Jammer missiles cannot be intercepted
+- Jammed radars disabled for 3 turns
+- Jam countdown decrements each turn
+- Jammed radars don't contribute to intercept bonus
 
-**Test:** `test_detection_range.gd`
-- [ ] Radar detects missiles within 6-block radius
-- [ ] Defensive towers within 6 blocks of radar are "boosted"
-- [ ] Unboosted defensive towers do not intercept
-- [ ] Detection range is consistent regardless of board size
-
-### Step 6.2: Radar-Dependent Interception
-Refine interception logic:
-- Defensive tower checks: Am I within 6 blocks of any radar?
-- If yes, can I see the incoming missile (is it within my 6-block range)?
-- If yes, attempt interception
-- If no radar nearby, defensive tower is inactive (no interception attempt)
-
-**Test:** `test_radar_dependent_intercept.gd`
-- [ ] No interception without radar in range
-- [ ] Interception possible when radar + defensive tower positioned correctly
-- [ ] Multiple radars can boost same defensive tower
-- [ ] Destroying radar disables nearby defensive towers
-
-### Step 6.3: Interception Visual Polish
-Enhance interception feedback:
-- Radar "ping" visual when detecting incoming
-- Veggie Cannon tracking animation before firing
-- Clear success/failure indication
-
-**Test:** `test_interception_visuals.gd`
-- [ ] Radar shows detection visual
-- [ ] Veggie Cannon shows aiming visual
-- [ ] Success/failure clearly communicated
-
-### Step 6.4: Multi-Projectile Interception
-Handle multiple incoming missiles:
-- Each projectile tracked separately
-- Veggie Cannon can intercept one projectile per turn
-- Multiple Veggie Cannons can intercept multiple projectiles
-- Interception priority: closest to impact first
-
-**Test:** `test_multi_projectile_intercept.gd`
-- [ ] Each projectile has independent intercept check
-- [ ] One Veggie Cannon = one intercept max
-- [ ] Remaining projectiles continue to target
-- [ ] Closest missiles intercepted first
-
-**[ENGAGE] Checkpoint 6.4:** Set up scenarios with and without radar. Verify defensive towers are useless alone but powerful with radar support. Test detection ranges feel right at 6 blocks.
+### Step 6.3: Loss Conditions
+- All bases destroyed = lose
+- No offensive structures AND no money = lose (cannot attack or buy)
 
 ---
 
-## Phase 7: Win/Lose Conditions
+## Phase 7: Win/Lose Polish [COMPLETED]
 
-**Goal:** Game ends meaningfully when all bases are destroyed.
+**Goal:** Clean game end states.
 
-### Step 7.1: Multi-Base Destruction Detection
+### Step 7.1: Game Over Detection
 - Track destruction of all 3 bases per side
-- Game continues while at least 1 base remains
-- Triggers `GameManager.set_winner(side)` when all 3 destroyed
-- Transitions to GAME_OVER state
-
-**Test:** `test_win_condition.gd`
-- [ ] Player loses when all 3 player bases destroyed
-- [ ] Player wins when all 3 enemy bases destroyed
-- [ ] Game state transitions to GAME_OVER
-- [ ] Partial base destruction does not end game
+- Detect no-offense-no-money loss condition
+- Transition to GAME_OVER state
 
 ### Step 7.2: Game Over Screen
-- Shows win/lose message
-- Displays turn count
-- Shows final economy stats (money earned, damage dealt)
-- Restart button
-
-**Test:** `test_game_over_screen.gd`
-- [ ] Correct message for win/lose
-- [ ] Turn count displayed
-- [ ] Stats displayed
-- [ ] Restart resets game state
-
-**[ENGAGE] Checkpoint 7.2:** Win a game. Lose a game. Does either feel meaningful? Is there satisfaction in victory? Is defeat a clear consequence of your decisions?
+- Win/lose message
+- "Play Again" returns to intro screen
+- Restart functionality
 
 ---
 
-## Phase 8: AI Opponent
+## Phase 8: Ground Combat System [NOT STARTED]
+
+**Goal:** Add transport units, ground troops, and ground-based defense creating a second combat layer.
+
+### Reference Behavior
+The game being mimicked features:
+- Transport units carry ground troops across the canal to the enemy island
+- Ground troops act autonomously to destroy enemy installations
+- Ground defense units (stationary or mobile) defend against invading troops
+- This creates tension between air superiority (missiles) and ground control
+
+### Step 8.1: Transport Unit
+Create `TRANSPORT` structure type:
+- Cost: $25
+- HP: 5
+- Capacity: 3 ground units
+- Behavior: During FIGHT phase, travels across canal to enemy island
+- Can be intercepted by defensive missiles (uses normal intercept chance)
+- If destroyed, all carried units are lost
+- If arrives, deploys carried units at landing zone
+
+**Test:** `test_transport.gd`
+- [ ] Transport can be placed on player grid
+- [ ] Transport stores reference to carried units
+- [ ] Transport can be targeted by enemy defenses
+- [ ] Transport destruction destroys carried units
+- [ ] Successful landing deploys units
+
+### Step 8.2: Ground Unit Base Class
+Create `GroundUnit` resource extending from base unit concept:
+- Properties: `unit_type`, `health`, `max_health`, `attack_damage`, `movement_speed`, `attack_range`
+- State: `current_position`, `target_structure`, `is_deployed`
+- Ground units exist on the enemy's island after transport landing
+
+**Test:** `test_ground_unit.gd`
+- [ ] Ground unit initializes with correct stats
+- [ ] Ground unit tracks position on enemy grid
+- [ ] Ground unit can acquire targets
+- [ ] Ground unit can take damage and be destroyed
+
+### Step 8.3: Infantry Unit
+Basic attacking ground unit:
+- Cost: $5 (loaded into transport)
+- HP: 3
+- Attack: 1 damage per turn to adjacent structures
+- Movement: 1 cell per turn
+- Behavior: Move toward nearest enemy structure, attack when adjacent
+- Priority targets: Radar > Defensive > Offensive > Economic > Base
+
+**Test:** `test_infantry.gd`
+- [ ] Infantry moves toward nearest target
+- [ ] Infantry attacks adjacent structures
+- [ ] Infantry follows target priority
+- [ ] Infantry pathfinding avoids obstacles
+
+### Step 8.4: Demolition Unit
+Specialized anti-structure ground unit:
+- Cost: $10
+- HP: 2 (fragile)
+- Attack: 3 damage (one-time explosion, destroys self)
+- Movement: 2 cells per turn (fast)
+- Behavior: Rush to highest-value target, detonate on arrival
+- Priority targets: Base > Radar > Economic > Defensive > Offensive
+
+**Test:** `test_demolition.gd`
+- [ ] Demolition unit moves 2 cells per turn
+- [ ] Demolition unit self-destructs on attack
+- [ ] Attack deals 3 damage
+- [ ] Follows correct target priority
+
+### Step 8.5: Stationary Ground Defense - Turret
+Ground-based defensive structure:
+- Cost: $10
+- HP: 5
+- Attack: 1 damage to ground units within 2-cell range
+- Behavior: Automatically targets and fires at enemy ground units each turn
+- Cannot move, cannot attack structures or missiles
+
+**Test:** `test_turret.gd`
+- [ ] Turret attacks ground units in range
+- [ ] Turret ignores missiles and structures
+- [ ] Turret fires once per turn
+- [ ] Turret prioritizes closest enemy
+
+### Step 8.6: Mobile Ground Defense - Patrol Unit
+Mobile defensive ground unit:
+- Cost: $15
+- HP: 4
+- Attack: 1 damage to adjacent ground units
+- Movement: 1 cell per turn
+- Behavior: Patrols between two points OR pursues nearest enemy ground unit
+- Mode toggle: Patrol vs. Pursue (set during placement)
+
+**Test:** `test_patrol_unit.gd`
+- [ ] Patrol unit moves along patrol path
+- [ ] Patrol unit switches to pursuit when enemy detected
+- [ ] Patrol unit attacks adjacent enemies
+- [ ] Patrol unit returns to patrol after enemy eliminated
+
+### Step 8.7: Ground Combat Resolution
+Integrate ground combat into FIGHT phase:
+1. Missiles fire and resolve (existing system)
+2. Transports travel (can be intercepted)
+3. Surviving transports deploy units
+4. Ground units act in initiative order:
+   - All ground units move simultaneously
+   - All ground units attack simultaneously
+   - Resolve damage after all attacks
+5. Repeat ground unit phase until:
+   - All attacking ground units destroyed, OR
+   - All defending ground units destroyed AND attackers reach targets
+
+**Test:** `test_ground_combat_flow.gd`
+- [ ] Ground phase occurs after missile phase
+- [ ] Units move before attacking
+- [ ] Damage resolves after all attacks
+- [ ] Ground combat ends correctly
+
+### Step 8.8: Transport Loading UI
+Allow player to load units into transports:
+- Select transport during PLACEMENT phase
+- Choose units to load (up to capacity)
+- Visual indicator showing transport contents
+- Cost of loaded units paid on loading
+
+**Test:** `test_transport_loading.gd`
+- [ ] Player can select transport
+- [ ] Player can add units up to capacity
+- [ ] Cannot exceed capacity
+- [ ] Unit cost deducted on load
+- [ ] Units removed from available pool
+
+**[ENGAGE] Checkpoint 8.8:** Load a transport with infantry, send it across. Does the transport journey feel tense? Is it satisfying when units deploy? Does ground combat feel like a meaningful second front?
+
+---
+
+## Phase 9: Balance Refinement [NOT STARTED]
+
+**Goal:** Extensive playtesting to ensure all units are viable and strategies are diverse.
+
+### Balance Philosophy
+- No dominant strategy should exist
+- Every unit should have a counter
+- Economic structures should be risky but rewarding
+- Defense should be strong but not impenetrable
+- Ground assault should be high-risk high-reward
+
+### Step 9.1: Offense vs. Defense Balance
+Test scenarios:
+1. All-offense strategy (missiles only)
+2. Balanced offense/defense
+3. Heavy defense + ground assault
+4. Economic boom into late-game dominance
+
+For each scenario, play 5 games and document:
+- Win rate
+- Average game length
+- Turning points
+- Frustration moments
+
+**[BALANCE] Checkpoint 9.1:** No single strategy should win >70% of games. If one does, adjust costs or stats.
+
+### Step 9.2: Intercept Chance Tuning
+Current: 50% base + 5% per radar
+
+Test variations:
+- 40% base + 10% per radar (radar more valuable)
+- 60% base + 3% per radar (radar less critical)
+- Cap at 80% or 90%?
+
+**[BALANCE] Checkpoint 9.2:** Defense should feel meaningful but not frustrating. Adjust until missiles feel threatening but not unstoppable.
+
+### Step 9.3: Ground Unit Balance
+Test ground-only strategies:
+- Mass infantry rush
+- Demolition strike team
+- Mixed ground force
+
+Vs. ground defense:
+- Turret wall
+- Mobile patrol network
+- Mixed defense
+
+**[BALANCE] Checkpoint 9.3:** Ground assault should be viable but counterable. Transport loss should be painful but not game-ending.
+
+### Step 9.4: Economic Balance
+Test economic strategies:
+- Early Lemonade Stand rush
+- Salad Bar healing efficiency
+- Income vs. direct combat spending
+
+**[BALANCE] Checkpoint 9.4:** Economic structures should be worth protecting. Ignoring economy should be a valid aggressive strategy.
+
+### Step 9.5: Radar Jammer Balance
+Test jammer effectiveness:
+- Single jammer impact
+- Multi-jammer saturation
+- Recovery from jam (3 turn duration)
+
+**[BALANCE] Checkpoint 9.5:** Jammers should create windows of opportunity but not guarantee success.
+
+### Step 9.6: Health and Damage Balance
+All structures: 5 HP
+All missiles: 1 damage, 3x3 area
+
+Test variations:
+- Higher HP structures (7-10)?
+- Variable damage by weapon type?
+- Smaller/larger area effects?
+
+**[BALANCE] Checkpoint 9.6:** Battles should last multiple turns. One-shot kills should be rare. Attrition should matter.
+
+### Step 9.7: Cost Tuning
+Review all costs relative to effectiveness:
+
+| Unit | Current Cost | Effectiveness Notes |
+|------|--------------|---------------------|
+| Hot Dog Cannon | $5 | Basic offense |
+| Condiment Cannon | $5 | Same as Hot Dog? Differentiate? |
+| Condiment Station | $10 | Worth 2x basic? |
+| Pickle Interceptor | $5 | Defensive value |
+| Coffee Radar | $10 | Intercept bonus value |
+| Veggie Cannon | $5 | Defensive value |
+| Lemonade Stand | $20 | Income ROI (4 turns to profit) |
+| Salad Bar | $20 | Healing value |
+| Radar Jammer | $15 | Anti-defense value |
+| Transport | $25 | Ground assault value |
+| Infantry | $5 | Ground offense |
+| Demolition | $10 | Burst damage value |
+| Turret | $10 | Ground defense |
+| Patrol | $15 | Mobile defense value |
+
+**[BALANCE] Checkpoint 9.7:** All units should see play in optimal strategies. No unit should be "never buy."
+
+### Step 9.8: Unit Differentiation
+Hot Dog Cannon vs Condiment Cannon are currently identical. Options:
+1. Different damage patterns (1x1 vs 3x3)
+2. Different fire rates (attack priority)
+3. Different costs
+4. Remove one
+
+**[BALANCE] Checkpoint 9.8:** Every unit should have a unique role. No two units should be interchangeable.
+
+### Step 9.9: Final Balance Pass
+After all adjustments, play 20 games using varied strategies:
+- Document each game's strategy and outcome
+- Identify any remaining dominant strategies
+- Identify any unused units
+- Make final adjustments
+
+**[BALANCE] Checkpoint 9.9:** Game should feel fair, strategic, and replayable. Multiple viable paths to victory.
+
+---
+
+## Phase 10: AI Opponent [FUTURE - NOT DETAILED]
 
 **Goal:** Enemy side makes autonomous decisions with basic strategy.
 
-### Step 8.1: AI Structure Placement
-Create `AIController`:
-- At game start, places 3 bases strategically (spread out)
-- Builds initial offensive/defensive structures within budget
-- Prioritizes radar + veggie cannon combos near bases
-- Respects grid constraints and economy
+*This phase will be detailed after gameplay is locked in.*
 
-**Test:** `test_ai_placement.gd`
-- [ ] AI places all 3 bases
-- [ ] AI spends starting money on structures
-- [ ] No overlapping placements
-- [ ] All placements within grid bounds
-
-### Step 8.2: AI Economy Management
-- AI earns money from damage like player
-- AI decides when to build vs. save
-- AI upgrades existing structures when beneficial
-
-**Test:** `test_ai_economy.gd`
-- [ ] AI tracks money correctly
-- [ ] AI makes purchase decisions
-- [ ] AI can upgrade structures
-
-### Step 8.3: AI Target Assignment
-- AI prioritizes revealed player structures
-- Targets bases when visible
-- Spreads attacks to reveal fog
-- Targets high-value structures (Lemonade Stands, Radars)
-
-**Test:** `test_ai_targeting.gd`
-- [ ] AI targets revealed structures preferentially
-- [ ] AI explores fog with some attacks
-- [ ] Targeting happens before execution
-
-### Step 8.4: AI Turn Integration
-- AI makes decisions instantly (or with brief delay for feel)
-- AI decisions made during player planning or at turn start
-
-**Test:** `test_ai_turn_integration.gd`
-- [ ] AI ready when player ends turn
-- [ ] AI structures participate in execution queue
-- [ ] AI can win/lose
-
-**[ENGAGE] Checkpoint 8.4:** Play several turns against the AI. Does it feel like an opponent with a plan? Is there tension not knowing where it will strike? Does AI defense feel threatening?
+### Planned Components
+- AI Structure Placement (strategic base and defense positioning)
+- AI Economy Management (purchase decisions)
+- AI Target Assignment (prioritization logic)
+- AI Ground Combat (transport loading, unit deployment)
+- AI Difficulty Levels (easy/medium/hard)
 
 ---
 
-## Phase 9: Visual Polish Pass
+## Phase 11: View System [FUTURE - NOT DETAILED]
 
-**Goal:** Upgrade placeholder visuals to food theme while maintaining engagement.
+**Goal:** Implement distinct views for different game phases.
 
-### Step 9.1: Structure Sprites
-Replace placeholder rectangles with food-themed sprites:
-- Base: Chef's station or main dish
-- Hot Dog Cannon: Hot dog launcher
-- Condiment Station: Ketchup/mustard dispenser
-- Coffee Cup Radar: Steaming coffee cup with radar dish
-- Veggie Cannon: Carrot/celery launcher
-- Lemonade Stand: Classic lemonade stand
-- Salad Bar: Salad bowl with healing glow
+*This phase will be detailed after AI is complete.*
 
-**Test:** Visual inspection - sprites load correctly.
-
-### Step 9.2: Projectile Sprites
-- Hot Dog Cannon: Flying hot dogs
-- Condiment Station: Mustard blob splash
-- Veggie Cannon intercept: Flying vegetables
-
-**Test:** Visual inspection - projectiles render correctly.
-
-### Step 9.3: Hit Effects
-- Sauce splatter on impact
-- Destruction effect (food explosion)
-- Healing effect (green sparkles)
-- Money earned effect (floating dollar signs)
-
-**Test:** Visual inspection - effects trigger correctly.
-
-### Step 9.4: Island & UI Theming
-- Grid appears as picnic tablecloth or cutting board
-- Canal styled as river of soda/juice
-- Fog of war as steam/smoke
-- Economy UI as cash register display
-
-**Test:** Visual inspection - theme cohesive.
-
-**[ENGAGE] Checkpoint 9.4:** Full playthrough with final visuals. Does the food theme add to engagement or distract? Does it still feel satisfying?
+### Planned Views
+- **Placement View:** Isometric, player's island only
+- **Targeting View:** Top-down grid, both islands visible
+- **Execution View:** Isometric, action playback with camera following projectiles/units
 
 ---
 
-## Success Criteria Verification
+## Phase 12: Visual Polish [FUTURE - NOT DETAILED]
 
-After all phases, verify the expanded prototype checklist:
+**Goal:** Upgrade placeholder visuals to food theme.
 
-### Core Mechanics
-- [ ] 32x32 grid-based placement works on both islands
-- [ ] Player can assign targets to offensive structures
-- [ ] AI opponent places structures and assigns targets strategically
-- [ ] Turn execution resolves all actions in priority order
+*This phase will be detailed after view system is complete.*
 
-### Economy System
-- [ ] Player starts with $10
-- [ ] Structures cost money to build
-- [ ] $5 earned per HP damage dealt
-- [ ] Lemonade Stands generate passive income
-- [ ] Cannot build without sufficient funds
+### Planned Polish
+- Structure sprites (food-themed)
+- Projectile sprites and trails
+- Hit effects and explosions
+- Ground unit sprites and animations
+- Island and UI theming
+- Sound effects and music
 
-### Fog of War
-- [ ] Enemy island starts fogged (landmass visible)
-- [ ] Missiles reveal cells as they travel
-- [ ] Revealed cells stay visible permanently
+---
 
-### Combat & Defense
-- [ ] Hot Dog Cannon fires single/multi projectiles based on upgrade
-- [ ] Condiment Station hits 3x3 area
-- [ ] Coffee Cup Radar detects incoming missiles
-- [ ] Veggie Cannon intercepts based on radar proximity (% chance)
-- [ ] Salad Bar heals nearby structures
+## Current Game State Summary
 
-### Win/Lose
-- [ ] Each player has 3 bases
-- [ ] Game ends when all 3 bases destroyed for one side
-- [ ] Correct winner determined
+### What Works
+- 8x8 grids for both islands
+- Base placement phase (3 bases each)
+- Structure placement with economy ($30 starting money)
+- Targeting system with fog of war
+- Turn execution with missiles
+- Interception system (50% + 5% per radar)
+- Radar jamming (3 turn duration)
+- Area damage (3x3 for all missiles)
+- Win/lose detection
+- Dev toolbar (fog toggle, restart)
+- Left-side toolbar with info panel
 
-### Visual Feedback
-- [ ] Projectile animations clear and readable
-- [ ] Interception visuals communicate success/failure
-- [ ] Economy changes visible (money earned/spent)
-- [ ] Fog reveal feels satisfying
+### What's Next
+- Ground combat system (Phase 8)
+- Balance refinement (Phase 9)
 
 ---
 
@@ -675,5 +578,8 @@ godot --headless -s addons/gut/gut_cmdln.gd -gtest=res://test/unit/test_game_man
 - Complete one step before moving to the next
 - Run relevant GUT tests after each step
 - At `[ENGAGE]` checkpoints, pause for manual playtesting
-- If engagement fails at a checkpoint, iterate on that step before proceeding
+- At `[BALANCE]` checkpoints, play multiple games and document findings
+- If engagement or balance fails at a checkpoint, iterate before proceeding
 - Commit working code after each successful step/phase
+- Keep `balance-notes.md` updated with playtest findings
+- Focus on gameplay feel before visual polish

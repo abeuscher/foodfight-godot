@@ -1251,50 +1251,6 @@ func _on_btn_restart_pressed() -> void:
 
 # --- Info Panel Hover System ---
 
-# Structure descriptions for info panel
-const STRUCTURE_INFO: Dictionary = {
-	Structure.Type.BASE: {
-		"name": "Base",
-		"desc": "Your headquarters. Protect it! Lose all bases and you lose the game."
-	},
-	Structure.Type.HOT_DOG_CANNON: {
-		"name": "Hot Dog Cannon",
-		"desc": "Fires hot dogs at enemy structures. Basic offensive weapon."
-	},
-	Structure.Type.CONDIMENT_CANNON: {
-		"name": "Condiment Cannon",
-		"desc": "Fires condiments in a splash pattern. Area damage."
-	},
-	Structure.Type.CONDIMENT_STATION: {
-		"name": "Condiment Station",
-		"desc": "Fires condiments with area damage. More powerful than cannon."
-	},
-	Structure.Type.PICKLE_INTERCEPTOR: {
-		"name": "Pickle Interceptor",
-		"desc": "Defensive. Can intercept incoming projectiles when radar is active."
-	},
-	Structure.Type.COFFEE_RADAR: {
-		"name": "Coffee Cup Radar",
-		"desc": "Detects incoming missiles in a 20-block radius. Required for interception."
-	},
-	Structure.Type.VEGGIE_CANNON: {
-		"name": "Veggie Cannon",
-		"desc": "Defensive interceptor. Shoots down enemy projectiles within radar range."
-	},
-	Structure.Type.LEMONADE_STAND: {
-		"name": "Lemonade Stand",
-		"desc": "Generates $5 passive income each round. Economic structure."
-	},
-	Structure.Type.SALAD_BAR: {
-		"name": "Salad Bar",
-		"desc": "Heals nearby structures by 1 HP each round. Support structure."
-	},
-	Structure.Type.RADAR_JAMMER: {
-		"name": "Radar Jammer",
-		"desc": "Jams enemy radars within 5 blocks of impact. Disables their defense."
-	},
-}
-
 func _setup_button_hover_signals() -> void:
 	# Map buttons to their structure types
 	var button_map: Dictionary = {
@@ -1319,10 +1275,10 @@ func _setup_button_hover_signals() -> void:
 
 
 func _on_toolbar_button_hover(structure_type) -> void:
-	if STRUCTURE_INFO.has(structure_type):
-		var info = STRUCTURE_INFO[structure_type]
-		info_title.text = info.name
-		info_description.text = info.desc
+	if Structure.STRUCTURE_DATA.has(structure_type):
+		var data = Structure.STRUCTURE_DATA[structure_type]
+		info_title.text = data["name"]
+		info_description.text = data["description"]
 
 
 func _on_undo_button_hover() -> void:
@@ -1336,11 +1292,11 @@ func _on_toolbar_button_unhover() -> void:
 
 
 func _update_info_panel_from_grid(structure: Resource) -> void:
-	if structure and STRUCTURE_INFO.has(structure.type):
-		var info = STRUCTURE_INFO[structure.type]
+	if structure and Structure.STRUCTURE_DATA.has(structure.type):
+		var data = Structure.STRUCTURE_DATA[structure.type]
 		var health_str = " (HP: %d)" % structure.health if not structure.is_destroyed else " (Destroyed)"
-		info_title.text = info.name + health_str
-		info_description.text = info.desc
+		info_title.text = data["name"] + health_str
+		info_description.text = data["description"]
 	else:
 		info_title.text = ""
 		info_description.text = ""

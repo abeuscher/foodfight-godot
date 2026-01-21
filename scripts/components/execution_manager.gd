@@ -150,11 +150,12 @@ func _execute_action(action: Dictionary) -> void:
 		var interceptor_local = target_grid_view.grid_to_screen_center(interceptor.grid_position)
 		var interceptor_pos = target_grid_view.global_position + interceptor_local
 
-		# Intercept point is 60% along the missile's path
-		var intercept_point = from_pos.lerp(to_pos, 0.6)
+		# Intercept point is past the canal (70%) - interceptors don't fire until missile enters enemy territory
+		var intercept_point = from_pos.lerp(to_pos, 0.7)
 
-		# Roll for intercept success (90% chance)
-		var intercept_success = randf() < INTERCEPT_CHANCE
+		# Roll for intercept success (50% base + 5% per active radar)
+		var intercept_chance = _calculate_intercept_chance(target_placement)
+		var intercept_success = randf() < intercept_chance
 
 		# Animate both projectiles - attack missile and interceptor missile firing to meet
 		projectile_fired.emit(from_pos, to_pos, is_player)
@@ -223,7 +224,19 @@ func _resolve_jam_attack(attacker: Resource, center: Vector2i, target_placement:
 			radar_jammed.emit(structure)
 
 
-const INTERCEPT_CHANCE: float = 0.9  # 90% chance to successfully intercept
+const BASE_INTERCEPT_CHANCE: float = 0.5  # 50% base chance to intercept
+const RADAR_INTERCEPT_BONUS: float = 0.05  # +5% per active radar
+
+
+func _calculate_intercept_chance(defending_placement: PlacementManager) -> float:
+	# Base intercept chance is 50%, +5% per active (non-jammed) radar
+	var radar_count = 0
+	for structure in defending_placement.get_structures():
+		if structure.radar_range > 0 and not structure.is_destroyed and not structure.is_jammed:
+			radar_count += 1
+
+	return BASE_INTERCEPT_CHANCE + (radar_count * RADAR_INTERCEPT_BONUS)
+
 
 func _find_interceptor(defending_placement: PlacementManager, target_pos: Vector2i) -> Resource:
 	# Find an interceptor that can intercept a projectile heading to target_pos
