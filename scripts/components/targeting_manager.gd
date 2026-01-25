@@ -43,13 +43,18 @@ func initialize(
 func select_structure(structure: Resource) -> bool:
 	if not structure:
 		return false
-	if not structure.is_offensive():
+	# Allow offensive structures OR loaded transports
+	if not structure.is_offensive() and not _is_loaded_transport(structure):
 		return false
 
 	selected_structure = structure
 	structure_selected.emit(structure)
 	queue_redraw()
 	return true
+
+
+func _is_loaded_transport(structure: Resource) -> bool:
+	return structure.is_transport() and structure.get_carried_unit_count() > 0
 
 
 func deselect() -> void:
@@ -59,13 +64,23 @@ func deselect() -> void:
 		queue_redraw()
 
 
-func assign_target(structure: Resource, target_pos: Vector2i) -> void:
-	if not structure or not structure.is_offensive():
-		return
+func assign_target(structure: Resource, target_pos: Vector2i) -> bool:
+	if not structure:
+		return false
+	# Allow offensive structures OR loaded transports
+	if not structure.is_offensive() and not _is_loaded_transport(structure):
+		return false
+
+	# For transports, validate landing zone is clear of structures
+	if _is_loaded_transport(structure):
+		var target_structure = enemy_placement.get_structure_at(target_pos)
+		if target_structure and not target_structure.is_destroyed:
+			return false  # Can't land on a structure
 
 	target_assignments[structure] = target_pos
 	target_assigned.emit(structure, target_pos)
 	queue_redraw()
+	return true
 
 
 func clear_target(structure: Resource) -> void:

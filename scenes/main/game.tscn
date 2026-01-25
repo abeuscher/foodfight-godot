@@ -59,10 +59,12 @@ theme_override_constants/separation = 2
 
 [node name="BtnBase" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
 text = "Base"
+alignment = 0
+icon_alignment = 0
 
 [node name="Sep1" type="HSeparator" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
@@ -70,52 +72,97 @@ layout_mode = 2
 
 [node name="BtnCannon" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "HD $5"
+text = "Hot Dog
+$5"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnCondiment" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "CS $10"
+text = "Condiment
+$10"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnInterceptor" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "VC $5"
+text = "Veggie
+$5"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnRadar" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "CR $10"
+text = "Radar
+$10"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnLemonade" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "LS $20"
+text = "Lemonade
+$20"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnSalad" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "SB $20"
+text = "Salad Bar
+$20"
+alignment = 0
+icon_alignment = 0
 
 [node name="BtnJammer" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 toggle_mode = true
-text = "RJ $15"
+text = "Jammer
+$15"
+alignment = 0
+icon_alignment = 0
+
+[node name="Sep3" type="HSeparator" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnTransport" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+toggle_mode = true
+text = "Transport
+$25"
+alignment = 0
+icon_alignment = 0
+
+[node name="BtnTurret" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+toggle_mode = true
+text = "Turret
+$10"
+alignment = 0
+icon_alignment = 0
 
 [node name="Sep2" type="HSeparator" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
@@ -131,31 +178,35 @@ text = "Undo"
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="InfoPanel" type="PanelContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(144, 100)
+[node name="InfoPanelIndent" type="MarginContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox"]
 layout_mode = 2
 size_flags_vertical = 8
+theme_override_constants/margin_left = 20
 
-[node name="InfoMargin" type="MarginContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel"]
+[node name="InfoPanel" type="PanelContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanelIndent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(124, 100)
 layout_mode = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
 
-[node name="InfoVBox" type="VBoxContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin"]
+[node name="InfoMargin" type="MarginContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanelIndent/InfoPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="InfoVBox" type="VBoxContainer" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanelIndent/InfoPanel/InfoMargin"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="InfoTitle" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin/InfoVBox"]
+[node name="InfoTitle" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanelIndent/InfoPanel/InfoMargin/InfoVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = ""
 horizontal_alignment = 1
 clip_text = true
 
-[node name="InfoDescription" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanel/InfoMargin/InfoVBox"]
+[node name="InfoDescription" type="Label" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/InfoPanelIndent/InfoPanel/InfoMargin/InfoVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -359,3 +410,68 @@ custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "Play Again"
+
+[node name="TransportLoadLayer" type="CanvasLayer" parent="."]
+layer = 99
+
+[node name="TransportLoadPanel" type="PanelContainer" parent="TransportLoadLayer"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -120.0
+offset_right = 150.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TransportLoadMargin" type="MarginContainer" parent="TransportLoadLayer/TransportLoadPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="TransportLoadVBox" type="VBoxContainer" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TransportLoadTitle" type="Label" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Load Transport"
+horizontal_alignment = 1
+
+[node name="TransportLoadStatus" type="Label" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Capacity: 0/3"
+horizontal_alignment = 1
+
+[node name="BtnLoadInfantry" type="Button" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "Infantry $5"
+
+[node name="BtnLoadDemolition" type="Button" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "Demolition $10"
+
+[node name="BtnLoadPatrol" type="Button" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "Patrol $15"
+
+[node name="BtnCloseTransportLoad" type="Button" parent="TransportLoadLayer/TransportLoadPanel/TransportLoadMargin/TransportLoadVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+text = "Done"

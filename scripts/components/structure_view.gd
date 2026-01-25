@@ -57,6 +57,25 @@ func _draw() -> void:
 	text_color.a = draw_color.a
 	draw_string(font, text_pos, abbrev, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, text_color)
 
+	# Draw HP if structure has taken damage (not ghost mode)
+	if not is_ghost and structure.health < structure.max_health:
+		var hp_text = str(structure.health)
+		var hp_font_size = int(radius * 0.6)
+		var hp_text_size = font.get_string_size(hp_text, HORIZONTAL_ALIGNMENT_CENTER, -1, hp_font_size)
+		var hp_pos = Vector2(-hp_text_size.x / 2, radius + hp_font_size * 0.8)
+		# Red text for low HP, yellow for medium, white for high
+		var hp_color = Color.RED if structure.health <= 2 else (Color.YELLOW if structure.health <= 3 else Color.WHITE)
+		draw_string(font, hp_pos, hp_text, HORIZONTAL_ALIGNMENT_CENTER, -1, hp_font_size, hp_color)
+
+	# Draw unit count for transports
+	if not is_ghost and structure.is_transport() and structure.get_carried_unit_count() > 0:
+		var unit_count = structure.get_carried_unit_count()
+		var count_text = "x%d" % unit_count
+		var count_font_size = int(radius * 0.5)
+		var count_text_size = font.get_string_size(count_text, HORIZONTAL_ALIGNMENT_CENTER, -1, count_font_size)
+		var count_pos = Vector2(radius * 0.3, -radius * 0.5)
+		draw_string(font, count_pos, count_text, HORIZONTAL_ALIGNMENT_LEFT, -1, count_font_size, Color.WHITE)
+
 
 func flash_placed() -> void:
 	# Simple scale animation for placement feedback

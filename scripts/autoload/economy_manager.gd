@@ -5,7 +5,7 @@ signal money_changed(side: String, new_amount: int)
 signal purchase_made(side: String, item_name: String, cost: int)
 signal income_earned(side: String, amount: int, reason: String)
 
-const PLAYER_STARTING_MONEY: int = 30
+const PLAYER_STARTING_MONEY: int = 500  # TODO: Revert to 30 after testing
 const ENEMY_STARTING_MONEY: int = 0  # Enemy has fixed arsenal, no economy
 const MONEY_PER_DAMAGE: int = 5  # $5 per HP damage dealt
 

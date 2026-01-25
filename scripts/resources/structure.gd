@@ -2,8 +2,8 @@ class_name Structure
 extends Resource
 ## Base data class for all placeable structures.
 
-enum Type { BASE, HOT_DOG_CANNON, CONDIMENT_CANNON, CONDIMENT_STATION, PICKLE_INTERCEPTOR, COFFEE_RADAR, VEGGIE_CANNON, LEMONADE_STAND, SALAD_BAR, RADAR_JAMMER }
-enum Category { CRITICAL, OFFENSIVE, DEFENSIVE }
+enum Type { BASE, HOT_DOG_CANNON, CONDIMENT_CANNON, CONDIMENT_STATION, PICKLE_INTERCEPTOR, COFFEE_RADAR, VEGGIE_CANNON, LEMONADE_STAND, SALAD_BAR, RADAR_JAMMER, TRANSPORT, TURRET }
+enum Category { CRITICAL, OFFENSIVE, DEFENSIVE, GROUND_TRANSPORT, GROUND_DEFENSE }
 
 # Centralized structure data - all attributes in one place
 const STRUCTURE_DATA: Dictionary = {
@@ -24,6 +24,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.HOT_DOG_CANNON: {
 		"abbreviation": "HD",
@@ -42,6 +44,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.CONDIMENT_CANNON: {
 		"abbreviation": "CC",
@@ -60,6 +64,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.CONDIMENT_STATION: {
 		"abbreviation": "CS",
@@ -78,6 +84,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.PICKLE_INTERCEPTOR: {
 		"abbreviation": "PI",
@@ -96,6 +104,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.COFFEE_RADAR: {
 		"abbreviation": "CR",
@@ -114,6 +124,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.VEGGIE_CANNON: {
 		"abbreviation": "VC",
@@ -132,6 +144,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.LEMONADE_STAND: {
 		"abbreviation": "LS",
@@ -150,6 +164,8 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 0,
 		"heal_amount": 0,
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.SALAD_BAR: {
 		"abbreviation": "SB",
@@ -168,24 +184,68 @@ const STRUCTURE_DATA: Dictionary = {
 		"heal_radius": 1,  # 3x3 area
 		"heal_amount": 1,  # 1 HP per turn
 		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 0,
 	},
 	Type.RADAR_JAMMER: {
 		"abbreviation": "RJ",
 		"name": "Radar Jammer",
-		"description": "Jams enemy radars for 3 turns. Cannot be intercepted. Disables defense.",
+		"description": "Jams enemy radars for 3 turns. Cannot be intercepted. Also deals 1 damage in 3x3 area.",
 		"category": Category.OFFENSIVE,  # Anti-defense weapon
 		"priority": 120,  # Highest priority - jams radar before other attacks
 		"color": Color(0.6, 0.2, 0.8),  # Purple (electronic warfare)
 		"cost": 15,
 		"health": 5,
-		"attack_damage": 0,  # Doesn't deal damage, just jams
+		"attack_damage": 1,  # 1 damage per square
+		"area_attack_radius": 1,  # 3x3 area
+		"interception_range": 0,
+		"radar_range": 0,
+		"income_per_turn": 0,
+		"heal_radius": 0,
+		"heal_amount": 0,
+		"jam_radius": 1,  # Must be > 0 to identify as jammer (prevents interception)
+		"transport_capacity": 0,
+		"turret_range": 0,
+	},
+	Type.TRANSPORT: {
+		"abbreviation": "TR",
+		"name": "Transport",
+		"description": "Carries up to 3 ground units across the canal. Can be intercepted by missiles.",
+		"category": Category.GROUND_TRANSPORT,
+		"priority": 30,  # Moves after jammers but before regular attacks
+		"color": Color(0.4, 0.6, 0.8),  # Light blue (naval/transport)
+		"cost": 25,
+		"health": 5,
+		"attack_damage": 0,
 		"area_attack_radius": 0,
 		"interception_range": 0,
 		"radar_range": 0,
 		"income_per_turn": 0,
 		"heal_radius": 0,
 		"heal_amount": 0,
-		"jam_radius": 5,  # Jams radars within 5 blocks of impact
+		"jam_radius": 0,
+		"transport_capacity": 3,  # Can carry 3 ground units
+		"turret_range": 0,
+	},
+	Type.TURRET: {
+		"abbreviation": "TU",
+		"name": "Turret",
+		"description": "Stationary defense that attacks enemy ground units within 2 cells.",
+		"category": Category.GROUND_DEFENSE,
+		"priority": 0,  # Defensive - doesn't initiate attacks
+		"color": Color(0.5, 0.5, 0.5),  # Gray (fortification)
+		"cost": 10,
+		"health": 5,
+		"attack_damage": 1,  # 1 damage to ground units
+		"area_attack_radius": 0,
+		"interception_range": 0,
+		"radar_range": 0,
+		"income_per_turn": 0,
+		"heal_radius": 0,
+		"heal_amount": 0,
+		"jam_radius": 0,
+		"transport_capacity": 0,
+		"turret_range": 2,  # Attacks ground units within 2 cells
 	},
 }
 
@@ -201,11 +261,14 @@ const STRUCTURE_DATA: Dictionary = {
 @export var heal_amount: int = 0  # HP healed per turn
 @export var radar_range: int = 0  # Range at which radar boosts nearby defenses
 @export var jam_radius: int = 0  # Radius for jamming radars (0 = no jamming)
+@export var transport_capacity: int = 0  # How many ground units this can carry (0 = not a transport)
+@export var turret_range: int = 0  # Range at which turret attacks ground units (0 = not a turret)
 @export var grid_position: Vector2i = Vector2i(-1, -1)
 
 var is_destroyed: bool = false
 var is_jammed: bool = false  # For radars - when jammed, they cannot detect missiles
 var jam_turns_remaining: int = 0  # Turns until jam wears off (0 = not jammed)
+var carried_units: Array = []  # For transports - ground units being carried
 
 
 # --- Static accessor functions (read from STRUCTURE_DATA) ---
@@ -257,6 +320,8 @@ static func create(structure_type: Type, pos: Vector2i = Vector2i(-1, -1)) -> Re
 	s.heal_radius = data["heal_radius"]
 	s.heal_amount = data["heal_amount"]
 	s.jam_radius = data["jam_radius"]
+	s.transport_capacity = data["transport_capacity"]
+	s.turret_range = data["turret_range"]
 
 	return s
 
@@ -293,3 +358,50 @@ func can_intercept_at(target_pos: Vector2i) -> bool:
 	var dx = abs(target_pos.x - grid_position.x)
 	var dy = abs(target_pos.y - grid_position.y)
 	return dx <= interception_range and dy <= interception_range
+
+
+func is_transport() -> bool:
+	return transport_capacity > 0
+
+
+func is_turret() -> bool:
+	return turret_range > 0
+
+
+func is_ground_defense() -> bool:
+	return get_category(type) == Category.GROUND_DEFENSE
+
+
+func can_load_unit(unit: Resource) -> bool:
+	if not is_transport():
+		return false
+	if is_destroyed:
+		return false
+	return carried_units.size() < transport_capacity
+
+
+func load_unit(unit: Resource) -> bool:
+	if not can_load_unit(unit):
+		return false
+	carried_units.append(unit)
+	return true
+
+
+func unload_all_units() -> Array:
+	var units = carried_units.duplicate()
+	carried_units.clear()
+	return units
+
+
+func get_carried_unit_count() -> int:
+	return carried_units.size()
+
+
+func can_target_ground_unit_at(target_pos: Vector2i) -> bool:
+	if turret_range <= 0:
+		return false
+	if is_destroyed:
+		return false
+	var dx = abs(target_pos.x - grid_position.x)
+	var dy = abs(target_pos.y - grid_position.y)
+	return dx <= turret_range and dy <= turret_range

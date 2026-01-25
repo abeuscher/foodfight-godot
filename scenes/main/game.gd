@@ -8,6 +8,7 @@ const TargetingManager = preload("res://scripts/components/targeting_manager.gd"
 const ExecutionManager = preload("res://scripts/components/execution_manager.gd")
 const FogManager = preload("res://scripts/components/fog_manager.gd")
 const IntroScreen = preload("res://scenes/main/intro.gd")
+const GroundUnit = preload("res://scripts/resources/ground_unit.gd")
 
 @onready var player_grid_view: Control = %PlayerGrid
 @onready var enemy_grid_view: Control = %EnemyGrid
@@ -23,8 +24,11 @@ const IntroScreen = preload("res://scenes/main/intro.gd")
 @onready var btn_lemonade: Button = %BtnLemonade
 @onready var btn_salad: Button = %BtnSalad
 @onready var btn_jammer: Button = %BtnJammer
+@onready var btn_transport: Button = %BtnTransport
+@onready var btn_turret: Button = %BtnTurret
 @onready var sep1: HSeparator = %Sep1
 @onready var sep2: HSeparator = %Sep2
+@onready var sep3: HSeparator = %Sep3
 @onready var btn_undo: Button = %BtnUndo
 @onready var btn_end_turn: Button = %BtnEndTurn
 @onready var round_label: Label = %RoundLabel
@@ -42,6 +46,14 @@ const IntroScreen = preload("res://scenes/main/intro.gd")
 @onready var dev_toolbar: HBoxContainer = %DevToolbar
 @onready var btn_toggle_fog: Button = %BtnToggleFog
 @onready var btn_restart: Button = %BtnRestart
+# Transport loading panel elements
+@onready var transport_load_panel: PanelContainer = %TransportLoadPanel
+@onready var transport_load_title: Label = %TransportLoadTitle
+@onready var transport_load_status: Label = %TransportLoadStatus
+@onready var btn_load_infantry: Button = %BtnLoadInfantry
+@onready var btn_load_demolition: Button = %BtnLoadDemolition
+@onready var btn_load_patrol: Button = %BtnLoadPatrol
+@onready var btn_close_transport_load: Button = %BtnCloseTransportLoad
 
 enum TurnPhase { BASE_PLACEMENT, PLACEMENT, TARGETING, FIGHT }
 
@@ -54,6 +66,7 @@ var enemy_targeting_manager: TargetingManager
 var execution_manager: ExecutionManager
 var enemy_fog_manager: FogManager  # Tracks what enemy can see on player grid
 var current_phase: TurnPhase = TurnPhase.BASE_PLACEMENT
+var _selected_transport: Resource = null  # Transport currently being loaded
 
 # Unified action history for undo
 # Each entry: {"type": "placement", "grid_pos": Vector2i, "structure_type": Type} or {"type": "target", "structure": Resource, "prev_target": Variant}
@@ -192,6 +205,8 @@ func _ready() -> void:
 	btn_lemonade.pressed.connect(_on_btn_lemonade_pressed)
 	btn_salad.pressed.connect(_on_btn_salad_pressed)
 	btn_jammer.pressed.connect(_on_btn_jammer_pressed)
+	btn_transport.pressed.connect(_on_btn_transport_pressed)
+	btn_turret.pressed.connect(_on_btn_turret_pressed)
 	btn_undo.pressed.connect(_on_btn_undo_pressed)
 	btn_end_turn.pressed.connect(_on_btn_end_turn_pressed)
 	btn_slate_continue.pressed.connect(_on_slate_continue_pressed)
@@ -201,8 +216,17 @@ func _ready() -> void:
 	btn_toggle_fog.pressed.connect(_on_btn_toggle_fog_pressed)
 	btn_restart.pressed.connect(_on_btn_restart_pressed)
 
+	# Connect transport loading panel buttons
+	btn_load_infantry.pressed.connect(_on_btn_load_infantry_pressed)
+	btn_load_demolition.pressed.connect(_on_btn_load_demolition_pressed)
+	btn_load_patrol.pressed.connect(_on_btn_load_patrol_pressed)
+	btn_close_transport_load.pressed.connect(_on_btn_close_transport_load_pressed)
+
 	# Connect button hover signals for info panel
 	_setup_button_hover_signals()
+
+	# Set up toolbar button icons (colored squares)
+	_setup_toolbar_icons()
 
 	# Connect execution manager signals
 	execution_manager.execution_started.connect(_on_execution_started)
@@ -212,6 +236,12 @@ func _ready() -> void:
 	execution_manager.structure_destroyed.connect(_on_structure_destroyed)
 	execution_manager.fog_reveal_path.connect(_on_fog_reveal_path)
 	execution_manager.radar_jammed.connect(_on_radar_jammed)
+	execution_manager.transport_launched.connect(_on_transport_launched)
+	execution_manager.transport_intercepted.connect(_on_transport_intercepted)
+	execution_manager.transport_landed.connect(_on_transport_landed)
+	execution_manager.ground_unit_deployed.connect(_on_ground_unit_deployed)
+	execution_manager.ground_unit_destroyed.connect(_on_ground_unit_destroyed)
+	execution_manager.transport_returned.connect(_on_transport_returned)
 
 	# Connect GameManager signals
 	GameManager.state_changed.connect(_on_game_state_changed)
@@ -549,24 +579,40 @@ func _on_btn_jammer_pressed() -> void:
 		placement_manager.select_structure_type(Structure.Type.RADAR_JAMMER)
 
 
+func _on_btn_transport_pressed() -> void:
+	targeting_manager.deselect()
+	if placement_manager.selected_type == Structure.Type.TRANSPORT:
+		placement_manager.deselect()
+	elif _can_select_structure(Structure.Type.TRANSPORT):
+		placement_manager.select_structure_type(Structure.Type.TRANSPORT)
+
+
+func _on_btn_turret_pressed() -> void:
+	targeting_manager.deselect()
+	if placement_manager.selected_type == Structure.Type.TURRET:
+		placement_manager.deselect()
+	elif _can_select_structure(Structure.Type.TURRET):
+		placement_manager.select_structure_type(Structure.Type.TURRET)
+
+
 func _on_btn_undo_pressed() -> void:
 	placement_manager.deselect()
 	targeting_manager.deselect()
 
 	# Determine which action types can be undone in current phase
-	var allowed_type: String
+	var allowed_types: Array = []
 	if current_phase == TurnPhase.BASE_PLACEMENT or current_phase == TurnPhase.PLACEMENT:
-		allowed_type = "placement"
+		allowed_types = ["placement", "unit_load"]
 	elif current_phase == TurnPhase.TARGETING:
-		allowed_type = "target"
+		allowed_types = ["target"]
 	else:
 		_update_status("Cannot undo during this phase")
 		return
 
-	# Find the last action of the allowed type
+	# Find the last action of an allowed type
 	var action_index = -1
 	for i in range(_action_history.size() - 1, -1, -1):
-		if _action_history[i].type == allowed_type:
+		if _action_history[i].type in allowed_types:
 			action_index = i
 			break
 
@@ -595,6 +641,20 @@ func _on_btn_undo_pressed() -> void:
 		"target":
 			targeting_manager.clear_target(action.structure)
 			_update_status("Undid target assignment")
+		"unit_load":
+			# Remove unit from transport and refund cost
+			var transport = action.transport
+			var unit = action.unit
+			if transport and transport.carried_units.has(unit):
+				transport.carried_units.erase(unit)
+				EconomyManager.refund("player", action.cost)
+				_update_status("Undid loading %s" % GroundUnit.get_display_name(action.unit_type))
+				# Update transport view
+				if placement_manager.structure_views.has(transport.grid_position):
+					placement_manager.structure_views[transport.grid_position].queue_redraw()
+				# Update panel if it's open for this transport
+				if _selected_transport == transport:
+					_update_transport_load_panel()
 
 
 func _on_structure_placed(structure: Resource, grid_pos: Vector2i) -> void:
@@ -622,10 +682,14 @@ func _on_structure_placed(structure: Resource, grid_pos: Vector2i) -> void:
 			_end_base_placement_phase()
 	else:
 		_update_status("Placed %s at (%d, %d)" % [sname, grid_pos.x, grid_pos.y])
-		# Deselect after placement so cursor returns to normal
-		placement_manager.deselect()
-		# Explicitly reset toolbar button states and release focus
-		_reset_all_build_buttons()
+		# Keep weapon selected for continued placement, unless no longer affordable
+		var structure_cost = Structure.get_cost(structure.type)
+		if structure_cost > 0 and not EconomyManager.can_afford("player", structure_cost):
+			# Can't afford another - deselect
+			placement_manager.deselect()
+			_reset_all_build_buttons()
+			_update_status("Placed %s - no longer affordable" % sname)
+		# Otherwise keep selected for continued placement
 
 
 func _on_placement_failed(_grid_pos: Vector2i, reason: String) -> void:
@@ -682,6 +746,13 @@ func _on_player_cell_hovered(grid_pos: Vector2i) -> void:
 					var t = targeting_manager.get_target(structure)
 					target_info = " -> (%d,%d)" % [t.x, t.y]
 				_update_status("Your %s%s - click to target" % [sname, target_info])
+			elif structure.is_transport() and structure.get_carried_unit_count() > 0:
+				var has_target = targeting_manager.has_target(structure)
+				var target_info = " (x%d)" % structure.get_carried_unit_count()
+				if has_target:
+					var t = targeting_manager.get_target(structure)
+					target_info += " -> (%d,%d)" % [t.x, t.y]
+				_update_status("Your %s%s - click to set landing zone" % [sname, target_info])
 			else:
 				_update_status("Your %s" % sname)
 
@@ -709,6 +780,8 @@ func _update_button_states(selected_type) -> void:
 	btn_lemonade.set_pressed_no_signal(selected_type == Structure.Type.LEMONADE_STAND)
 	btn_salad.set_pressed_no_signal(selected_type == Structure.Type.SALAD_BAR)
 	btn_jammer.set_pressed_no_signal(selected_type == Structure.Type.RADAR_JAMMER)
+	btn_transport.set_pressed_no_signal(selected_type == Structure.Type.TRANSPORT)
+	btn_turret.set_pressed_no_signal(selected_type == Structure.Type.TURRET)
 	# Release focus from all buttons when nothing is selected
 	if selected_type == null:
 		btn_base.release_focus()
@@ -719,6 +792,8 @@ func _update_button_states(selected_type) -> void:
 		btn_lemonade.release_focus()
 		btn_salad.release_focus()
 		btn_jammer.release_focus()
+		btn_transport.release_focus()
+		btn_turret.release_focus()
 
 
 func _update_status(text: String) -> void:
@@ -766,6 +841,8 @@ func _update_inventory_buttons() -> void:
 	_update_purchasable_button(btn_lemonade, Structure.Type.LEMONADE_STAND, "LS")
 	_update_purchasable_button(btn_salad, Structure.Type.SALAD_BAR, "SB")
 	_update_purchasable_button(btn_jammer, Structure.Type.RADAR_JAMMER, "RJ")
+	_update_purchasable_button(btn_transport, Structure.Type.TRANSPORT, "TR")
+	_update_purchasable_button(btn_turret, Structure.Type.TURRET, "TU")
 
 
 func _update_purchasable_button(btn: Button, structure_type, label: String) -> void:
@@ -775,7 +852,7 @@ func _update_purchasable_button(btn: Button, structure_type, label: String) -> v
 
 
 func _reset_all_build_buttons() -> void:
-	var buttons = [btn_base, btn_cannon, btn_condiment, btn_interceptor, btn_radar, btn_lemonade, btn_salad, btn_jammer]
+	var buttons = [btn_base, btn_cannon, btn_condiment, btn_interceptor, btn_radar, btn_lemonade, btn_salad, btn_jammer, btn_transport, btn_turret]
 	for btn in buttons:
 		btn.set_pressed_no_signal(false)
 		btn.release_focus()
@@ -806,21 +883,36 @@ func _end_base_placement_phase() -> void:
 	_setup_enemy_structures()
 	# Clear bases from inventory (already placed)
 	_inventory[Structure.Type.BASE] = 0
-	# Start Round 1 placement phase
-	current_phase = TurnPhase.PLACEMENT
-	_update_phase_ui()
-	_update_inventory_buttons()
-	_show_slate("ROUND %d" % GameManager.turn_number, "Placement Phase", false)
+	# Start Round 1 - skip placement if player has no money
+	_start_planning_phase()
+
+
+func _start_planning_phase() -> void:
+	# Start planning phase - skip placement if player has no money
+	if EconomyManager.player_money <= 0:
+		# No money - skip directly to targeting phase
+		current_phase = TurnPhase.TARGETING
+		placement_manager.deselect()
+		_update_phase_ui()
+		_update_inventory_buttons()
+		_show_slate("ROUND %d" % GameManager.turn_number, "Targeting Phase (No funds for placement)", false)
+	else:
+		# Normal placement phase
+		current_phase = TurnPhase.PLACEMENT
+		_update_phase_ui()
+		_update_inventory_buttons()
+		_show_slate("ROUND %d" % GameManager.turn_number, "Placement Phase", false)
 
 
 func _on_btn_end_turn_pressed() -> void:
 	if not GameManager.is_planning():
 		return
 
-	# Deselect everything
+	# Deselect everything and close panels
 	placement_manager.deselect()
 	targeting_manager.deselect()
 	_update_button_states(null)
+	_hide_transport_load_panel()
 
 	if current_phase == TurnPhase.BASE_PLACEMENT:
 		_end_base_placement_phase()
@@ -843,6 +935,8 @@ func _on_execution_started() -> void:
 	# Hide targeting lines during execution
 	targeting_manager.show_lines = false
 	targeting_manager.queue_redraw()
+	# Hide transport loading panel
+	_hide_transport_load_panel()
 
 
 func _on_execution_finished() -> void:
@@ -863,19 +957,16 @@ func _on_execution_finished() -> void:
 
 	GameManager.end_execution()
 	if GameManager.is_planning():
-		# Reset to placement phase for new round
-		current_phase = TurnPhase.PLACEMENT
 		# Clear action history for new round
 		_action_history.clear()
-		_update_phase_ui()
 		_set_planning_ui_enabled(true)
 		# Show targeting lines again for planning phase
 		targeting_manager.show_lines = true
 		targeting_manager.queue_redraw()
 		# Assign new enemy targets for this turn
 		_assign_enemy_targets()
-		# Show new round slate
-		_show_slate("ROUND %d" % GameManager.turn_number, "Placement Phase", false)
+		# Start new round - skip placement if player has no money
+		_start_planning_phase()
 
 
 func _on_projectile_intercepted(interceptor: Resource, _target_pos: Vector2i) -> void:
@@ -887,6 +978,130 @@ func _on_radar_jammed(radar: Resource) -> void:
 	var is_enemy = _is_enemy_structure(radar)
 	var owner_str = "Enemy" if is_enemy else "Your"
 	_update_status("%s Coffee Cup Radar has been jammed!" % owner_str)
+
+
+func _on_transport_launched(transport: Resource, is_player: bool) -> void:
+	var owner_str = "Your" if is_player else "Enemy"
+	var unit_count = transport.get_carried_unit_count()
+	_update_status("%s Transport launching with %d unit(s)!" % [owner_str, unit_count])
+
+
+func _on_transport_intercepted(transport: Resource) -> void:
+	var is_player = not _is_enemy_structure(transport)
+	var owner_str = "Your" if is_player else "Enemy"
+	_update_status("%s Transport shot down! All units lost!" % owner_str)
+
+
+func _on_transport_landed(transport: Resource, _landing_pos: Vector2i) -> void:
+	var is_player = not _is_enemy_structure(transport)
+	var owner_str = "Your" if is_player else "Enemy"
+	_update_status("%s Transport landed successfully!" % owner_str)
+
+
+func _on_ground_unit_deployed(unit: Resource, grid_pos: Vector2i) -> void:
+	var unit_name = _get_ground_unit_name(unit)
+	_update_status("%s deployed at (%d, %d)" % [unit_name, grid_pos.x, grid_pos.y])
+
+
+func _on_ground_unit_destroyed(unit: Resource) -> void:
+	var unit_name = _get_ground_unit_name(unit)
+	_update_status("%s destroyed!" % unit_name)
+
+
+func _on_transport_returned(transport: Resource, units_returned: int) -> void:
+	_update_status("%d unit(s) returned to transport!" % units_returned)
+	# Update transport view to show reloaded units
+	if transport and placement_manager.structure_views.has(transport.grid_position):
+		placement_manager.structure_views[transport.grid_position].queue_redraw()
+
+
+func _get_ground_unit_name(unit: Resource) -> String:
+	return GroundUnit.get_display_name(unit.unit_type)
+
+
+# --- Transport Loading UI ---
+
+func _show_transport_load_panel(transport: Resource) -> void:
+	_selected_transport = transport
+	transport_load_panel.visible = true
+	_update_transport_load_panel()
+
+
+func _hide_transport_load_panel() -> void:
+	_selected_transport = null
+	transport_load_panel.visible = false
+
+
+func _update_transport_load_panel() -> void:
+	if not _selected_transport:
+		return
+
+	var current_load = _selected_transport.get_carried_unit_count()
+	var capacity = _selected_transport.transport_capacity
+	transport_load_status.text = "Loaded: %d / %d" % [current_load, capacity]
+
+	# Update button states based on affordability and capacity
+	var can_add_more = current_load < capacity
+
+	var infantry_cost = GroundUnit.get_cost(GroundUnit.UnitType.INFANTRY)
+	var demolition_cost = GroundUnit.get_cost(GroundUnit.UnitType.DEMOLITION)
+	var patrol_cost = GroundUnit.get_cost(GroundUnit.UnitType.PATROL)
+
+	btn_load_infantry.text = "Infantry $%d" % infantry_cost
+	btn_load_demolition.text = "Demolition $%d" % demolition_cost
+	btn_load_patrol.text = "Patrol $%d" % patrol_cost
+
+	btn_load_infantry.disabled = not can_add_more or not EconomyManager.can_afford("player", infantry_cost)
+	btn_load_demolition.disabled = not can_add_more or not EconomyManager.can_afford("player", demolition_cost)
+	btn_load_patrol.disabled = not can_add_more or not EconomyManager.can_afford("player", patrol_cost)
+
+
+func _on_btn_load_infantry_pressed() -> void:
+	_load_unit_into_transport(GroundUnit.UnitType.INFANTRY)
+
+
+func _on_btn_load_demolition_pressed() -> void:
+	_load_unit_into_transport(GroundUnit.UnitType.DEMOLITION)
+
+
+func _on_btn_load_patrol_pressed() -> void:
+	_load_unit_into_transport(GroundUnit.UnitType.PATROL)
+
+
+func _load_unit_into_transport(unit_type) -> void:
+	if not _selected_transport:
+		return
+
+	var cost = GroundUnit.get_cost(unit_type)
+	if not EconomyManager.can_afford("player", cost):
+		_update_status("Cannot afford %s" % GroundUnit.get_display_name(unit_type))
+		return
+
+	if not _selected_transport.can_load_unit(null):  # Just checking capacity
+		_update_status("Transport is full!")
+		return
+
+	# Create the unit and load it
+	var unit = GroundUnit.create(unit_type, true)
+	if _selected_transport.load_unit(unit):
+		EconomyManager.spend("player", cost, GroundUnit.get_display_name(unit_type))
+		_update_status("Loaded %s into transport" % GroundUnit.get_display_name(unit_type))
+		# Record action for undo
+		_action_history.append({
+			"type": "unit_load",
+			"transport": _selected_transport,
+			"unit": unit,
+			"unit_type": unit_type,
+			"cost": cost
+		})
+		_update_transport_load_panel()
+		# Update the structure view to show carried units
+		if placement_manager.structure_views.has(_selected_transport.grid_position):
+			placement_manager.structure_views[_selected_transport.grid_position].queue_redraw()
+
+
+func _on_btn_close_transport_load_pressed() -> void:
+	_hide_transport_load_panel()
 
 
 func _on_structure_hit(structure: Resource, damage: int) -> void:
@@ -941,6 +1156,8 @@ func _set_planning_ui_enabled(enabled: bool) -> void:
 		btn_lemonade.disabled = true
 		btn_salad.disabled = true
 		btn_jammer.disabled = true
+		btn_transport.disabled = true
+		btn_turret.disabled = true
 	else:
 		_update_inventory_buttons()
 	btn_undo.disabled = not enabled
@@ -1045,11 +1262,53 @@ func _apply_area_healing(healer: Resource, pm: PlacementManager) -> void:
 
 func _on_money_changed(_side: String, _new_amount: int) -> void:
 	_update_money_display()
+	_update_toolbar_button_states()
+	# Auto-deselect if current selection is no longer affordable
+	_check_selection_affordability()
 
 
 func _update_money_display() -> void:
 	player_money_label.text = "$%d" % EconomyManager.player_money
 	enemy_money_label.text = "$%d" % EconomyManager.enemy_money
+
+
+func _check_selection_affordability() -> void:
+	# If a purchased structure is selected but no longer affordable, deselect it
+	if current_phase != TurnPhase.PLACEMENT:
+		return
+	if placement_manager.selected_type == null:
+		return
+	var cost = Structure.get_cost(placement_manager.selected_type)
+	if cost > 0 and not EconomyManager.can_afford("player", cost):
+		placement_manager.deselect()
+		_update_status("No longer affordable - deselected")
+
+
+func _update_toolbar_button_states() -> void:
+	# Disable buttons for weapons the player cannot afford during placement phase
+	if current_phase != TurnPhase.PLACEMENT:
+		# During other phases, just enable all (they'll be hidden or inactive anyway)
+		btn_cannon.disabled = false
+		btn_condiment.disabled = false
+		btn_interceptor.disabled = false
+		btn_radar.disabled = false
+		btn_lemonade.disabled = false
+		btn_salad.disabled = false
+		btn_jammer.disabled = false
+		btn_transport.disabled = false
+		btn_turret.disabled = false
+		return
+
+	# Check affordability for each purchasable structure
+	btn_cannon.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.HOT_DOG_CANNON))
+	btn_condiment.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.CONDIMENT_STATION))
+	btn_interceptor.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.VEGGIE_CANNON))
+	btn_radar.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.COFFEE_RADAR))
+	btn_lemonade.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.LEMONADE_STAND))
+	btn_salad.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.SALAD_BAR))
+	btn_jammer.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.RADAR_JAMMER))
+	btn_transport.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.TRANSPORT))
+	btn_turret.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.TURRET))
 
 
 func _on_fog_reveal_path(from_grid: Vector2i, to_grid: Vector2i, is_player_projectile: bool) -> void:
@@ -1131,6 +1390,9 @@ func _update_phase_ui() -> void:
 	btn_lemonade.visible = not hide_structure_buttons
 	btn_salad.visible = not hide_structure_buttons
 	btn_jammer.visible = not hide_structure_buttons
+	sep3.visible = not hide_structure_buttons
+	btn_transport.visible = not hide_structure_buttons
+	btn_turret.visible = not hide_structure_buttons
 	sep2.visible = not hide_structure_buttons
 
 	# Hide end turn button during base placement (auto-ends when done)
@@ -1142,6 +1404,7 @@ func _update_phase_ui() -> void:
 		round_label.text = "Round %d - %s" % [GameManager.turn_number, phase_name]
 	_update_status(_get_phase_status_text())
 	_update_phase_button_states()
+	_update_toolbar_button_states()
 
 
 func _get_phase_status_text() -> String:
@@ -1172,6 +1435,8 @@ func _update_phase_button_states() -> void:
 		btn_lemonade.disabled = true
 		btn_salad.disabled = true
 		btn_jammer.disabled = true
+		btn_transport.disabled = true
+		btn_turret.disabled = true
 	else:
 		_update_inventory_buttons()
 		# Clear any targeting selection when entering placement phase
@@ -1192,6 +1457,12 @@ func _on_player_grid_clicked(grid_pos: Vector2i) -> void:
 				if placement_manager.structure_views.has(grid_pos):
 					placement_manager.structure_views[grid_pos].flash_placed()
 		TurnPhase.PLACEMENT:
+			# First check if clicking on an existing transport to load units
+			var existing_structure = placement_manager.get_structure_at(grid_pos)
+			if existing_structure and existing_structure.is_transport():
+				_show_transport_load_panel(existing_structure)
+				return
+
 			# Check if player can place the selected structure
 			if placement_manager.selected_type != null:
 				var structure_type = placement_manager.selected_type
@@ -1210,9 +1481,9 @@ func _on_player_grid_clicked(grid_pos: Vector2i) -> void:
 					if placement_manager.structure_views.has(grid_pos):
 						placement_manager.structure_views[grid_pos].flash_placed()
 		TurnPhase.TARGETING:
-			# Targeting: select offensive structures
+			# Targeting: select offensive structures OR loaded transports
 			var structure = placement_manager.get_structure_at(grid_pos)
-			if structure and structure.is_offensive():
+			if structure and (structure.is_offensive() or (structure.is_transport() and structure.get_carried_unit_count() > 0)):
 				targeting_manager.select_structure(structure)
 			else:
 				targeting_manager.deselect()
@@ -1226,8 +1497,13 @@ func _on_targeting_enemy_click(grid_pos: Vector2i) -> void:
 	if current_phase != TurnPhase.TARGETING:
 		return
 	if targeting_manager.selected_structure:
-		targeting_manager.assign_target(targeting_manager.selected_structure, grid_pos)
-		targeting_manager.deselect()
+		var success = targeting_manager.assign_target(targeting_manager.selected_structure, grid_pos)
+		if success:
+			targeting_manager.deselect()
+		else:
+			# Failed to assign - likely transport trying to land on a structure
+			if targeting_manager.selected_structure.is_transport():
+				_update_status("Cannot land transport there - space is occupied!")
 
 
 # --- Dev Toolbar ---
@@ -1251,6 +1527,42 @@ func _on_btn_restart_pressed() -> void:
 
 # --- Info Panel Hover System ---
 
+func _setup_toolbar_icons() -> void:
+	# Create colored square icons for each toolbar button
+	var button_types: Dictionary = {
+		btn_base: Structure.Type.BASE,
+		btn_cannon: Structure.Type.HOT_DOG_CANNON,
+		btn_condiment: Structure.Type.CONDIMENT_STATION,
+		btn_interceptor: Structure.Type.VEGGIE_CANNON,
+		btn_radar: Structure.Type.COFFEE_RADAR,
+		btn_lemonade: Structure.Type.LEMONADE_STAND,
+		btn_salad: Structure.Type.SALAD_BAR,
+		btn_jammer: Structure.Type.RADAR_JAMMER,
+		btn_transport: Structure.Type.TRANSPORT,
+		btn_turret: Structure.Type.TURRET,
+	}
+
+	for btn in button_types.keys():
+		var structure_type = button_types[btn]
+		var color = Structure.get_color(structure_type)
+		btn.icon = _create_color_icon(color, 16, 16)
+
+
+func _create_color_icon(color: Color, width: int, height: int) -> ImageTexture:
+	# Create a small colored square image to use as button icon
+	var image = Image.create(width, height, false, Image.FORMAT_RGBA8)
+	image.fill(color)
+	# Add a slight border
+	var border_color = color.darkened(0.3)
+	for x in range(width):
+		image.set_pixel(x, 0, border_color)
+		image.set_pixel(x, height - 1, border_color)
+	for y in range(height):
+		image.set_pixel(0, y, border_color)
+		image.set_pixel(width - 1, y, border_color)
+	return ImageTexture.create_from_image(image)
+
+
 func _setup_button_hover_signals() -> void:
 	# Map buttons to their structure types
 	var button_map: Dictionary = {
@@ -1262,6 +1574,8 @@ func _setup_button_hover_signals() -> void:
 		btn_lemonade: Structure.Type.LEMONADE_STAND,
 		btn_salad: Structure.Type.SALAD_BAR,
 		btn_jammer: Structure.Type.RADAR_JAMMER,
+		btn_transport: Structure.Type.TRANSPORT,
+		btn_turret: Structure.Type.TURRET,
 	}
 
 	for btn in button_map.keys():
