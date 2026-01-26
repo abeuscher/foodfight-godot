@@ -130,6 +130,16 @@ $20"
 alignment = 0
 icon_alignment = 0
 
+[node name="BtnGenerator" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+toggle_mode = true
+text = "Food Truck
+$15"
+alignment = 0
+icon_alignment = 0
+
 [node name="BtnJammer" type="Button" parent="MainLayout/LeftPanel/LeftPanelMargin/LeftPanelVBox/ToolbarContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)
@@ -253,6 +263,12 @@ layout_mode = 2
 text = "$10"
 horizontal_alignment = 1
 
+[node name="PlayerEnergy" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/PlayerIsland"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Energy: 6/6"
+horizontal_alignment = 1
+
 [node name="PlayerGrid" type="Control" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/PlayerIsland"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(512, 512)
@@ -298,6 +314,12 @@ layout_mode = 2
 text = "$10"
 horizontal_alignment = 1
 
+[node name="EnemyEnergy" type="Label" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/EnemyIsland"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Energy: 6/6"
+horizontal_alignment = 1
+
 [node name="EnemyGrid" type="Control" parent="MainLayout/GameArea/BattlefieldCenter/BattlefieldContainer/EnemyIsland"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(512, 512)
@@ -322,6 +344,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 40)
 layout_mode = 2
 text = "End Placement"
+
+[node name="BtnReviewAll" type="Button" parent="MainLayout/GameArea/BottomPanel"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+toggle_mode = true
+text = "Show All Paths"
 
 [node name="DevToolbar" type="HBoxContainer" parent="."]
 unique_name_in_owner = true

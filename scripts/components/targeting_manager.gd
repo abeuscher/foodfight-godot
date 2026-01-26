@@ -19,9 +19,13 @@ var selected_structure: Resource = null
 var target_assignments: Dictionary = {}  # Structure -> Vector2i
 var block_next_player_click: bool = false  # Set by game.gd after placement
 var show_lines: bool = true  # Whether to draw targeting lines
+var show_all_lines: bool = false  # When true, show all lines (Review All mode)
 
-var _target_line_color: Color = Color(1.0, 0.5, 0.2, 0.8)
+var _target_line_color: Color = Color(1.0, 0.5, 0.2, 0.8)  # Orange for weapons
+var _transport_line_color: Color = Color(0.3, 0.6, 1.0, 0.8)  # Blue for transports
 var _selected_highlight_color: Color = Color(1.0, 1.0, 0.5, 0.4)
+var _assigned_dot_color: Color = Color(1.0, 0.5, 0.2, 0.6)  # Dot for assigned but not selected
+var _transport_dot_color: Color = Color(0.3, 0.6, 1.0, 0.6)  # Blue dot for transports
 
 
 func initialize(
@@ -109,6 +113,16 @@ func clear_all_targets() -> void:
 	queue_redraw()
 
 
+func set_review_all(enabled: bool) -> void:
+	show_all_lines = enabled
+	queue_redraw()
+
+
+func toggle_review_all() -> void:
+	show_all_lines = not show_all_lines
+	queue_redraw()
+
+
 func _on_player_cell_clicked(grid_pos: Vector2i) -> void:
 	# Block click if a structure was just placed (same click event)
 	if block_next_player_click:
@@ -163,11 +177,20 @@ func _draw_target_lines() -> void:
 		var start = _get_structure_screen_pos(structure)
 		var end = _get_enemy_cell_screen_pos(target_pos)
 
-		# Draw line
-		draw_line(start, end, _target_line_color, 2.0)
+		# Determine color based on structure type
+		var is_transport = structure.is_transport()
+		var line_color = _transport_line_color if is_transport else _target_line_color
+		var dot_color = _transport_dot_color if is_transport else _assigned_dot_color
 
-		# Draw arrowhead
-		_draw_arrowhead(start, end)
+		# Show full line for selected structure OR when "Show All Paths" is active
+		var is_selected = (structure == selected_structure)
+		if is_selected or show_all_lines:
+			# Draw full line with arrow
+			draw_line(start, end, line_color, 2.0)
+			_draw_arrowhead(start, end, line_color)
+		else:
+			# Draw small indicator dot on the structure to show it has a target
+			draw_circle(start, 6.0, dot_color)
 
 
 func _draw_selection_highlight() -> void:
@@ -179,7 +202,7 @@ func _draw_selection_highlight() -> void:
 	draw_arc(pos, radius, 0, TAU, 32, _selected_highlight_color, 4.0)
 
 
-func _draw_arrowhead(start: Vector2, end: Vector2) -> void:
+func _draw_arrowhead(start: Vector2, end: Vector2, color: Color = Color.WHITE) -> void:
 	var direction = (end - start).normalized()
 	var arrow_size = 12.0
 	var arrow_angle = 0.4  # radians
@@ -187,8 +210,8 @@ func _draw_arrowhead(start: Vector2, end: Vector2) -> void:
 	var left = end - direction.rotated(arrow_angle) * arrow_size
 	var right = end - direction.rotated(-arrow_angle) * arrow_size
 
-	draw_line(end, left, _target_line_color, 2.0)
-	draw_line(end, right, _target_line_color, 2.0)
+	draw_line(end, left, color, 2.0)
+	draw_line(end, right, color, 2.0)
 
 
 func _get_structure_screen_pos(structure: Resource) -> Vector2:

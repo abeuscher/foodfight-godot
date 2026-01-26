@@ -16,6 +16,8 @@ const GroundUnit = preload("res://scripts/resources/ground_unit.gd")
 @onready var status_label: Label = %StatusLabel
 @onready var player_money_label: Label = %PlayerMoney
 @onready var enemy_money_label: Label = %EnemyMoney
+@onready var player_energy_label: Label = %PlayerEnergy
+@onready var enemy_energy_label: Label = %EnemyEnergy
 @onready var btn_base: Button = %BtnBase
 @onready var btn_cannon: Button = %BtnCannon
 @onready var btn_condiment: Button = %BtnCondiment
@@ -23,6 +25,7 @@ const GroundUnit = preload("res://scripts/resources/ground_unit.gd")
 @onready var btn_radar: Button = %BtnRadar
 @onready var btn_lemonade: Button = %BtnLemonade
 @onready var btn_salad: Button = %BtnSalad
+@onready var btn_generator: Button = %BtnGenerator
 @onready var btn_jammer: Button = %BtnJammer
 @onready var btn_transport: Button = %BtnTransport
 @onready var btn_turret: Button = %BtnTurret
@@ -31,6 +34,7 @@ const GroundUnit = preload("res://scripts/resources/ground_unit.gd")
 @onready var sep3: HSeparator = %Sep3
 @onready var btn_undo: Button = %BtnUndo
 @onready var btn_end_turn: Button = %BtnEndTurn
+@onready var btn_review_all: Button = %BtnReviewAll
 @onready var round_label: Label = %RoundLabel
 @onready var slate: ColorRect = %Slate
 @onready var slate_title: Label = %SlateTitle
@@ -204,11 +208,13 @@ func _ready() -> void:
 	btn_radar.pressed.connect(_on_btn_radar_pressed)
 	btn_lemonade.pressed.connect(_on_btn_lemonade_pressed)
 	btn_salad.pressed.connect(_on_btn_salad_pressed)
+	btn_generator.pressed.connect(_on_btn_generator_pressed)
 	btn_jammer.pressed.connect(_on_btn_jammer_pressed)
 	btn_transport.pressed.connect(_on_btn_transport_pressed)
 	btn_turret.pressed.connect(_on_btn_turret_pressed)
 	btn_undo.pressed.connect(_on_btn_undo_pressed)
 	btn_end_turn.pressed.connect(_on_btn_end_turn_pressed)
+	btn_review_all.toggled.connect(_on_btn_review_all_toggled)
 	btn_slate_continue.pressed.connect(_on_slate_continue_pressed)
 	btn_slate_reset.pressed.connect(_on_slate_reset_pressed)
 
@@ -238,6 +244,7 @@ func _ready() -> void:
 	execution_manager.radar_jammed.connect(_on_radar_jammed)
 	execution_manager.transport_launched.connect(_on_transport_launched)
 	execution_manager.transport_intercepted.connect(_on_transport_intercepted)
+	execution_manager.action_skipped_no_energy.connect(_on_action_skipped_no_energy)
 	execution_manager.transport_landed.connect(_on_transport_landed)
 	execution_manager.ground_unit_deployed.connect(_on_ground_unit_deployed)
 	execution_manager.ground_unit_destroyed.connect(_on_ground_unit_destroyed)
@@ -248,8 +255,10 @@ func _ready() -> void:
 
 	# Connect EconomyManager signals
 	EconomyManager.money_changed.connect(_on_money_changed)
+	EconomyManager.energy_changed.connect(_on_energy_changed)
 	EconomyManager.reset()
 	_update_money_display()
+	_update_energy_display()
 
 	_update_inventory_buttons()
 	_update_phase_ui()
@@ -262,8 +271,8 @@ func _ready() -> void:
 
 
 func _setup_enemy_structures() -> void:
-	# Place enemy bases - number scaled to grid size (same as player)
-	var base_count = _get_base_count_for_grid_size()
+	# Place enemy bases - one more than player
+	var base_count = _get_base_count_for_grid_size() + 1
 	var back_x = int(GRID_SIZE * 0.8)  # 80% across
 
 	if base_count >= 1:
@@ -272,6 +281,8 @@ func _setup_enemy_structures() -> void:
 		enemy_placement_manager.place_structure(Structure.Type.BASE, Vector2i(back_x, int(GRID_SIZE * 0.25)))
 	if base_count >= 3:
 		enemy_placement_manager.place_structure(Structure.Type.BASE, Vector2i(back_x, int(GRID_SIZE * 0.75)))
+	if base_count >= 4:
+		enemy_placement_manager.place_structure(Structure.Type.BASE, Vector2i(back_x - 2, int(GRID_SIZE * 0.4)))
 
 	# Place enemy offensive structures - front of island (low x)
 	var front_x = int(GRID_SIZE * 0.25)
@@ -287,12 +298,18 @@ func _setup_enemy_structures() -> void:
 	enemy_placement_manager.place_structure(Structure.Type.VEGGIE_CANNON, Vector2i(mid_x - 2, int(GRID_SIZE * 0.35)))
 	enemy_placement_manager.place_structure(Structure.Type.VEGGIE_CANNON, Vector2i(mid_x - 2, int(GRID_SIZE * 0.65)))
 
+	# Place two Food Truck Generators for energy generation
+	var gen_x = int(GRID_SIZE * 0.7)
+	enemy_placement_manager.place_structure(Structure.Type.GENERATOR, Vector2i(gen_x, int(GRID_SIZE * 0.3)))
+	enemy_placement_manager.place_structure(Structure.Type.GENERATOR, Vector2i(gen_x, int(GRID_SIZE * 0.7)))
+
 	# Assign initial targets for enemy cannons
 	_assign_enemy_targets()
 
 
 func _assign_enemy_targets() -> void:
 	# Smart AI: target player structures that enemy has discovered through fog
+	# Now also respects energy budget
 	var player_structures = placement_manager.get_structures()
 	var visible_targets: Array = []
 
@@ -311,12 +328,24 @@ func _assign_enemy_targets() -> void:
 	# Sort targets by priority (higher priority = more valuable target)
 	visible_targets.sort_custom(_compare_target_priority)
 
-	# Assign targets to enemy offensive structures
+	# Track energy budget
+	var energy_remaining = EconomyManager.enemy_max_energy
+
+	# Get offensive structures and sort by priority (higher priority = fire first)
+	var offensive_structures: Array = []
 	for structure in enemy_placement_manager.get_structures():
-		if structure.is_destroyed:
+		if structure.is_destroyed or not structure.is_offensive():
 			continue
-		if not structure.is_offensive():
-			continue
+		offensive_structures.append(structure)
+
+	# Sort by attack priority (higher fires first)
+	offensive_structures.sort_custom(func(a, b): return a.attack_priority > b.attack_priority)
+
+	# Assign targets to enemy offensive structures within energy budget
+	for structure in offensive_structures:
+		# Check if we have enough energy for this weapon
+		if structure.energy_cost > energy_remaining:
+			continue  # Skip this weapon - not enough energy
 
 		# Pick a target - prioritize high-value targets with some randomness
 		var target: Resource
@@ -331,6 +360,7 @@ func _assign_enemy_targets() -> void:
 			continue
 
 		enemy_targeting_manager.assign_target(structure, target.grid_position)
+		energy_remaining -= structure.energy_cost
 
 
 func _compare_target_priority(a: Resource, b: Resource) -> bool:
@@ -571,6 +601,14 @@ func _on_btn_salad_pressed() -> void:
 		placement_manager.select_structure_type(Structure.Type.SALAD_BAR)
 
 
+func _on_btn_generator_pressed() -> void:
+	targeting_manager.deselect()
+	if placement_manager.selected_type == Structure.Type.GENERATOR:
+		placement_manager.deselect()
+	elif _can_select_structure(Structure.Type.GENERATOR):
+		placement_manager.select_structure_type(Structure.Type.GENERATOR)
+
+
 func _on_btn_jammer_pressed() -> void:
 	targeting_manager.deselect()
 	if placement_manager.selected_type == Structure.Type.RADAR_JAMMER:
@@ -641,6 +679,7 @@ func _on_btn_undo_pressed() -> void:
 		"target":
 			targeting_manager.clear_target(action.structure)
 			_update_status("Undid target assignment")
+			_update_energy_display()
 		"unit_load":
 			# Remove unit from transport and refund cost
 			var transport = action.transport
@@ -724,6 +763,8 @@ func _on_target_assigned(structure: Resource, target_pos: Vector2i) -> void:
 	# Note: We need to get prev_target BEFORE the assignment happens, so we track it differently
 	# For simplicity, we'll just clear the target on undo (prev_target = null means remove)
 	_action_history.append({"type": "target", "structure": structure, "prev_target": null})
+	# Update energy display to show committed energy
+	_update_energy_display()
 
 
 func _on_player_cell_hovered(grid_pos: Vector2i) -> void:
@@ -840,6 +881,7 @@ func _update_inventory_buttons() -> void:
 	_update_purchasable_button(btn_radar, Structure.Type.COFFEE_RADAR, "CR")
 	_update_purchasable_button(btn_lemonade, Structure.Type.LEMONADE_STAND, "LS")
 	_update_purchasable_button(btn_salad, Structure.Type.SALAD_BAR, "SB")
+	_update_purchasable_button(btn_generator, Structure.Type.GENERATOR, "GN")
 	_update_purchasable_button(btn_jammer, Structure.Type.RADAR_JAMMER, "RJ")
 	_update_purchasable_button(btn_transport, Structure.Type.TRANSPORT, "TR")
 	_update_purchasable_button(btn_turret, Structure.Type.TURRET, "TU")
@@ -852,7 +894,7 @@ func _update_purchasable_button(btn: Button, structure_type, label: String) -> v
 
 
 func _reset_all_build_buttons() -> void:
-	var buttons = [btn_base, btn_cannon, btn_condiment, btn_interceptor, btn_radar, btn_lemonade, btn_salad, btn_jammer, btn_transport, btn_turret]
+	var buttons = [btn_base, btn_cannon, btn_condiment, btn_interceptor, btn_radar, btn_lemonade, btn_salad, btn_generator, btn_jammer, btn_transport, btn_turret]
 	for btn in buttons:
 		btn.set_pressed_no_signal(false)
 		btn.release_focus()
@@ -888,6 +930,10 @@ func _end_base_placement_phase() -> void:
 
 
 func _start_planning_phase() -> void:
+	# Refresh energy for both sides at start of turn
+	EconomyManager.refresh_energy("player", placement_manager.get_structures())
+	EconomyManager.refresh_energy("enemy", enemy_placement_manager.get_structures())
+
 	# Start planning phase - skip placement if player has no money
 	if EconomyManager.player_money <= 0:
 		# No money - skip directly to targeting phase
@@ -927,6 +973,10 @@ func _on_btn_end_turn_pressed() -> void:
 		current_phase = TurnPhase.FIGHT
 		_update_phase_ui()
 		_show_slate("ROUND %d" % GameManager.turn_number, "Fight!", false)
+
+
+func _on_btn_review_all_toggled(pressed: bool) -> void:
+	targeting_manager.set_review_all(pressed)
 
 
 func _on_execution_started() -> void:
@@ -990,6 +1040,13 @@ func _on_transport_intercepted(transport: Resource) -> void:
 	var is_player = not _is_enemy_structure(transport)
 	var owner_str = "Your" if is_player else "Enemy"
 	_update_status("%s Transport shot down! All units lost!" % owner_str)
+
+
+func _on_action_skipped_no_energy(structure: Resource, energy_needed: int) -> void:
+	var is_player = not _is_enemy_structure(structure)
+	if is_player:
+		var sname = Structure.get_display_name(structure.type)
+		_update_status("%s skipped - not enough energy! (needed %d)" % [sname, energy_needed])
 
 
 func _on_transport_landed(transport: Resource, _landing_pos: Vector2i) -> void:
@@ -1155,6 +1212,7 @@ func _set_planning_ui_enabled(enabled: bool) -> void:
 		btn_radar.disabled = true
 		btn_lemonade.disabled = true
 		btn_salad.disabled = true
+		btn_generator.disabled = true
 		btn_jammer.disabled = true
 		btn_transport.disabled = true
 		btn_turret.disabled = true
@@ -1272,6 +1330,62 @@ func _update_money_display() -> void:
 	enemy_money_label.text = "$%d" % EconomyManager.enemy_money
 
 
+func _on_energy_changed(_side: String, _current: int, _max_energy: int) -> void:
+	_update_energy_display()
+
+
+func _update_energy_display() -> void:
+	var player_max = EconomyManager.player_max_energy
+	var enemy_max = EconomyManager.enemy_max_energy
+
+	# During targeting, show committed energy
+	if current_phase == TurnPhase.TARGETING:
+		var committed = _calculate_committed_energy()
+		var remaining = player_max - committed
+		player_energy_label.text = "Energy: %d/%d (-%d)" % [remaining, player_max, committed]
+
+		# Color code based on remaining energy
+		if remaining < 0:
+			player_energy_label.modulate = Color(1.0, 0.3, 0.3)  # Red when over-committed
+		elif remaining == 0:
+			player_energy_label.modulate = Color(1.0, 0.6, 0.3)  # Orange when exactly used
+		else:
+			player_energy_label.modulate = Color(1.0, 1.0, 1.0)  # Normal
+	else:
+		var player_current = EconomyManager.player_energy
+		player_energy_label.text = "Energy: %d/%d" % [player_current, player_max]
+
+		# Color code based on energy remaining
+		if player_current <= 0 and player_max > 0:
+			player_energy_label.modulate = Color(1.0, 0.4, 0.4)  # Red when empty
+		elif player_current < player_max * 0.3:
+			player_energy_label.modulate = Color(1.0, 0.8, 0.4)  # Yellow when low
+		else:
+			player_energy_label.modulate = Color(1.0, 1.0, 1.0)  # Normal
+
+	enemy_energy_label.text = "Energy: %d" % enemy_max
+
+
+func _calculate_committed_energy() -> int:
+	## Calculate total energy committed by current target assignments
+	var total = 0
+	var assignments = targeting_manager.get_all_assignments()
+	for structure in assignments:
+		if structure.is_destroyed:
+			continue
+		total += structure.energy_cost
+	return total
+
+
+func _clear_target_with_refund(structure: Resource) -> void:
+	## Clear a structure's target and update energy display
+	if targeting_manager.has_target(structure):
+		targeting_manager.clear_target(structure)
+		var sname = Structure.get_display_name(structure.type)
+		_update_status("%s target cleared" % sname)
+		_update_energy_display()
+
+
 func _check_selection_affordability() -> void:
 	# If a purchased structure is selected but no longer affordable, deselect it
 	if current_phase != TurnPhase.PLACEMENT:
@@ -1294,6 +1408,7 @@ func _update_toolbar_button_states() -> void:
 		btn_radar.disabled = false
 		btn_lemonade.disabled = false
 		btn_salad.disabled = false
+		btn_generator.disabled = false
 		btn_jammer.disabled = false
 		btn_transport.disabled = false
 		btn_turret.disabled = false
@@ -1306,6 +1421,7 @@ func _update_toolbar_button_states() -> void:
 	btn_radar.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.COFFEE_RADAR))
 	btn_lemonade.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.LEMONADE_STAND))
 	btn_salad.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.SALAD_BAR))
+	btn_generator.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.GENERATOR))
 	btn_jammer.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.RADAR_JAMMER))
 	btn_transport.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.TRANSPORT))
 	btn_turret.disabled = not EconomyManager.can_afford("player", Structure.get_cost(Structure.Type.TURRET))
@@ -1434,6 +1550,7 @@ func _update_phase_button_states() -> void:
 		btn_radar.disabled = true
 		btn_lemonade.disabled = true
 		btn_salad.disabled = true
+		btn_generator.disabled = true
 		btn_jammer.disabled = true
 		btn_transport.disabled = true
 		btn_turret.disabled = true
@@ -1441,6 +1558,12 @@ func _update_phase_button_states() -> void:
 		_update_inventory_buttons()
 		# Clear any targeting selection when entering placement phase
 		targeting_manager.deselect()
+
+	# Show Review All button only during targeting phase
+	btn_review_all.visible = (current_phase == TurnPhase.TARGETING)
+	if current_phase != TurnPhase.TARGETING:
+		btn_review_all.button_pressed = false
+		targeting_manager.set_review_all(false)
 
 
 func _on_player_grid_clicked(grid_pos: Vector2i) -> void:
@@ -1486,6 +1609,9 @@ func _on_player_grid_clicked(grid_pos: Vector2i) -> void:
 			if structure and (structure.is_offensive() or (structure.is_transport() and structure.get_carried_unit_count() > 0)):
 				targeting_manager.select_structure(structure)
 			else:
+				# Clicking on empty space while a weapon is selected: clear that weapon's target
+				if targeting_manager.selected_structure and targeting_manager.has_target(targeting_manager.selected_structure):
+					_clear_target_with_refund(targeting_manager.selected_structure)
 				targeting_manager.deselect()
 		TurnPhase.FIGHT:
 			# No interactions during fight
@@ -1497,12 +1623,29 @@ func _on_targeting_enemy_click(grid_pos: Vector2i) -> void:
 	if current_phase != TurnPhase.TARGETING:
 		return
 	if targeting_manager.selected_structure:
-		var success = targeting_manager.assign_target(targeting_manager.selected_structure, grid_pos)
+		var structure = targeting_manager.selected_structure
+		var energy_cost = structure.energy_cost
+
+		# Check if we have enough energy (considering already committed energy)
+		var currently_committed = _calculate_committed_energy()
+		# If this structure already has a target, its cost is already in committed
+		var already_committed_for_this = energy_cost if targeting_manager.has_target(structure) else 0
+		var new_commitment = currently_committed - already_committed_for_this + energy_cost
+
+		if new_commitment > EconomyManager.player_max_energy:
+			_update_status("Not enough energy! Need %d, would use %d/%d" % [energy_cost, new_commitment, EconomyManager.player_max_energy])
+			return
+
+		var success = targeting_manager.assign_target(structure, grid_pos)
 		if success:
-			targeting_manager.deselect()
+			# Keep the structure selected so its targeting line stays visible
+			# Player can click another weapon to switch, or click empty space to deselect
+			_update_energy_display()
+			var sname = Structure.get_display_name(structure.type)
+			_update_status("%s targeting (%d, %d) - click another weapon or empty space" % [sname, grid_pos.x, grid_pos.y])
 		else:
 			# Failed to assign - likely transport trying to land on a structure
-			if targeting_manager.selected_structure.is_transport():
+			if structure.is_transport():
 				_update_status("Cannot land transport there - space is occupied!")
 
 
@@ -1537,6 +1680,7 @@ func _setup_toolbar_icons() -> void:
 		btn_radar: Structure.Type.COFFEE_RADAR,
 		btn_lemonade: Structure.Type.LEMONADE_STAND,
 		btn_salad: Structure.Type.SALAD_BAR,
+		btn_generator: Structure.Type.GENERATOR,
 		btn_jammer: Structure.Type.RADAR_JAMMER,
 		btn_transport: Structure.Type.TRANSPORT,
 		btn_turret: Structure.Type.TURRET,
@@ -1573,6 +1717,7 @@ func _setup_button_hover_signals() -> void:
 		btn_radar: Structure.Type.COFFEE_RADAR,
 		btn_lemonade: Structure.Type.LEMONADE_STAND,
 		btn_salad: Structure.Type.SALAD_BAR,
+		btn_generator: Structure.Type.GENERATOR,
 		btn_jammer: Structure.Type.RADAR_JAMMER,
 		btn_transport: Structure.Type.TRANSPORT,
 		btn_turret: Structure.Type.TURRET,

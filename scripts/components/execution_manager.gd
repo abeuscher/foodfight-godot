@@ -23,6 +23,7 @@ signal ground_unit_attacked(attacker: Resource, target: Resource, damage: int)
 signal ground_unit_destroyed(unit: Resource)
 signal structure_attacked_by_ground(structure: Resource, attacker: Resource, damage: int)
 signal transport_returned(transport: Resource, units_returned: int)
+signal action_skipped_no_energy(structure: Resource, energy_needed: int)
 
 const GroundUnit = preload("res://scripts/resources/ground_unit.gd")
 
@@ -41,6 +42,7 @@ var _active_projectiles: Array = []
 # Ground combat tracking
 var _player_deployed_units: Array = []  # Ground units player deployed on enemy island
 var _enemy_deployed_units: Array = []   # Ground units enemy deployed on player island
+var _transports_to_return: Array = []   # Transports that need to fly home after ground combat
 
 # Projectile visual settings
 var _player_projectile_color: Color = Color(0.2, 0.8, 0.2, 1.0)  # Green for player
@@ -153,6 +155,17 @@ func _execute_action(action: Dictionary) -> void:
 	if structure.is_destroyed:
 		return
 
+	# Check and consume energy before firing
+	var energy_cost = structure.energy_cost
+	var side = "player" if is_player else "enemy"
+	if energy_cost > 0:
+		if not EconomyManager.can_spend_energy(side, energy_cost):
+			# Not enough energy - skip this action
+			action_skipped_no_energy.emit(structure, energy_cost)
+			return
+		# Consume energy
+		EconomyManager.spend_energy(side, energy_cost)
+
 	# Calculate screen positions
 	var from_local = source_grid_view.grid_to_screen_center(structure.grid_position)
 	var from_pos = source_grid_view.global_position + from_local
@@ -162,8 +175,9 @@ func _execute_action(action: Dictionary) -> void:
 
 	# Check for interception (radar jammers cannot be intercepted)
 	var interceptor = null
+	var defending_side = "enemy" if is_player else "player"
 	if structure.jam_radius <= 0:
-		interceptor = _find_interceptor(target_placement, target_pos)
+		interceptor = _find_interceptor(target_placement, target_pos, defending_side)
 	if interceptor:
 		# Calculate intercept position (midpoint between missile path and interceptor)
 		var interceptor_local = target_grid_view.grid_to_screen_center(interceptor.grid_position)
@@ -172,8 +186,8 @@ func _execute_action(action: Dictionary) -> void:
 		# Intercept point is past the canal (70%) - interceptors don't fire until missile enters enemy territory
 		var intercept_point = from_pos.lerp(to_pos, 0.7)
 
-		# Roll for intercept success (50% base + 5% per active radar)
-		var intercept_chance = _calculate_intercept_chance(target_placement)
+		# Roll for intercept success (50% base + 5% per radar + weapon modifiers)
+		var intercept_chance = _calculate_intercept_chance(target_placement, structure)
 		var intercept_success = randf() < intercept_chance
 
 		# Animate both projectiles - attack missile and interceptor missile firing to meet
@@ -249,40 +263,44 @@ func _resolve_jam_attack(attacker: Resource, center: Vector2i, target_placement:
 			structure.jam_turns_remaining = JAM_DURATION
 			radar_jammed.emit(structure)
 
-	# Radar jammer also does 1 damage in 3x3 area (area_attack_radius = 1)
-	var damage_radius = 1  # 3x3 area
-	for dx in range(-damage_radius, damage_radius + 1):
-		for dy in range(-damage_radius, damage_radius + 1):
-			var check_pos = Vector2i(center.x + dx, center.y + dy)
-			var target_structure = target_placement.get_structure_at(check_pos)
-			if target_structure and not target_structure.is_destroyed:
-				var destroyed = target_structure.take_damage(1)
-				structure_hit.emit(target_structure, 1)
-				if destroyed:
-					structure_destroyed.emit(target_structure)
+	# Radar jammer does no damage - jams only
 
 
 const BASE_INTERCEPT_CHANCE: float = 0.5  # 50% base chance to intercept
 const RADAR_INTERCEPT_BONUS: float = 0.05  # +5% per active radar
 const TRANSPORT_INTERCEPT_CHANCE: float = 0.1  # 10% chance to intercept transports (they're harder to hit)
 
+# Weapon-specific intercept modifiers (food logic)
+const HOT_DOG_INTERCEPT_MODIFIER: float = 0.10  # +10% - dense, easy to track and swat
+const CONDIMENT_INTERCEPT_MODIFIER: float = -0.10  # -10% - splatters, harder to intercept
 
-func _calculate_intercept_chance(defending_placement: PlacementManager) -> float:
+
+func _calculate_intercept_chance(defending_placement: PlacementManager, attacker: Resource = null) -> float:
 	# Base intercept chance is 50%, +5% per active (non-jammed) radar
 	var radar_count = 0
 	for structure in defending_placement.get_structures():
 		if structure.radar_range > 0 and not structure.is_destroyed and not structure.is_jammed:
 			radar_count += 1
 
-	return BASE_INTERCEPT_CHANCE + (radar_count * RADAR_INTERCEPT_BONUS)
+	var base_chance = BASE_INTERCEPT_CHANCE + (radar_count * RADAR_INTERCEPT_BONUS)
+
+	# Apply weapon-specific modifiers
+	if attacker:
+		if attacker.type == Structure.Type.HOT_DOG_CANNON:
+			base_chance += HOT_DOG_INTERCEPT_MODIFIER  # Easier to intercept
+		elif attacker.type == Structure.Type.CONDIMENT_CANNON or attacker.type == Structure.Type.CONDIMENT_STATION:
+			base_chance += CONDIMENT_INTERCEPT_MODIFIER  # Harder to intercept
+
+	return clampf(base_chance, 0.0, 1.0)  # Clamp between 0% and 100%
 
 
-func _find_interceptor(defending_placement: PlacementManager, target_pos: Vector2i) -> Resource:
+func _find_interceptor(defending_placement: PlacementManager, target_pos: Vector2i, side: String = "") -> Resource:
 	# Find an interceptor that can intercept a projectile heading to target_pos
 	# KEY RULES:
 	# - Defensive towers do NOTHING without radar
 	# - Radar has 20-block detection radius
 	# - Silos within radar's range can intercept ANY missile within radar's detection zone
+	# - Interceptors consume 1 energy per attempt
 
 	# First, find all active (non-jammed) radar structures
 	var radars: Array = []
@@ -307,7 +325,7 @@ func _find_interceptor(defending_placement: PlacementManager, target_pos: Vector
 	if not detecting_radar:
 		return null
 
-	# Find a defensive tower within the detecting radar's range
+	# Find a defensive tower within the detecting radar's range that has energy to fire
 	for structure in defending_placement.get_structures():
 		if structure.is_destroyed or structure.interception_range <= 0:
 			continue
@@ -318,6 +336,12 @@ func _find_interceptor(defending_placement: PlacementManager, target_pos: Vector
 			abs(structure.grid_position.y - detecting_radar.grid_position.y)
 		)
 		if dist_to_radar <= detecting_radar.radar_range:
+			# Check if we have energy for this interceptor (1 energy per attempt)
+			if side != "" and structure.energy_cost > 0:
+				if not EconomyManager.can_spend_energy(side, structure.energy_cost):
+					continue  # No energy, try another interceptor
+				# Consume energy for this interception attempt
+				EconomyManager.spend_energy(side, structure.energy_cost)
 			# This tower can attempt interception
 			return structure
 
@@ -475,8 +499,23 @@ func _animate_interception(attack_from: Vector2, attack_to: Vector2, interceptor
 
 
 func _draw() -> void:
-	# Projectiles draw themselves
-	pass
+	# Draw deployed ground units as colored dots
+	_draw_deployed_units(_player_deployed_units, enemy_grid_view)
+	_draw_deployed_units(_enemy_deployed_units, player_grid_view)
+
+
+func _draw_deployed_units(units: Array, grid_view: Control) -> void:
+	if not grid_view:
+		return
+	for unit in units:
+		if unit.is_destroyed or not unit.is_deployed:
+			continue
+		var screen_pos = grid_view.global_position + grid_view.grid_to_screen_center(unit.current_position)
+		var local_pos = screen_pos - global_position
+		var unit_color = GroundUnit.get_color(unit.unit_type)
+		# Draw unit marker (small colored circle with outline)
+		draw_circle(local_pos, 6.0, unit_color)
+		draw_arc(local_pos, 6.0, 0, TAU, 16, unit_color.darkened(0.3), 2.0)
 
 
 # === TRANSPORT PHASE ===
@@ -491,6 +530,13 @@ func _execute_transport_phase() -> void:
 			continue
 		if transport.get_carried_unit_count() == 0:
 			continue
+		# Check energy before launching transport
+		var energy_cost = transport.energy_cost
+		if energy_cost > 0:
+			if not EconomyManager.can_spend_energy("player", energy_cost):
+				action_skipped_no_energy.emit(transport, energy_cost)
+				continue
+			EconomyManager.spend_energy("player", energy_cost)
 		var landing_pos = player_assignments[transport]
 		await _process_transport(transport, true, landing_pos)
 		await get_tree().create_timer(_action_delay).timeout
@@ -505,6 +551,13 @@ func _execute_transport_phase() -> void:
 				continue
 			if transport.get_carried_unit_count() == 0:
 				continue
+			# Check energy before launching transport
+			var energy_cost = transport.energy_cost
+			if energy_cost > 0:
+				if not EconomyManager.can_spend_energy("enemy", energy_cost):
+					action_skipped_no_energy.emit(transport, energy_cost)
+					continue
+				EconomyManager.spend_energy("enemy", energy_cost)
 			var landing_pos = enemy_assignments[transport]
 			await _process_transport(transport, false, landing_pos)
 			await get_tree().create_timer(_action_delay).timeout
@@ -535,7 +588,8 @@ func _process_transport(transport: Resource, is_player: bool, landing_pos: Vecto
 	var to_pos = target_grid_view.global_position + to_local
 
 	# Check for interception (transports can be shot down, but are harder to hit)
-	var interceptor = _find_interceptor(target_placement, landing_pos)
+	var defending_side = "enemy" if is_player else "player"
+	var interceptor = _find_interceptor(target_placement, landing_pos, defending_side)
 	if interceptor:
 		var interceptor_local = target_grid_view.grid_to_screen_center(interceptor.grid_position)
 		var interceptor_pos = target_grid_view.global_position + interceptor_local
@@ -549,6 +603,8 @@ func _process_transport(transport: Resource, is_player: bool, landing_pos: Vecto
 
 		if intercept_success:
 			# Transport destroyed - all carried units lost
+			transport.unload_all_units()  # Clear units (they're lost)
+			transport.is_destroyed = true
 			transport_intercepted.emit(transport)
 			return
 
@@ -660,6 +716,9 @@ func _deploy_transport_units(transport: Resource, landing_pos: Vector2i, is_play
 
 		offset = -offset if offset <= 0 else -(offset + 1)  # 0, -1, 1, -2, 2...
 
+	# Redraw to show persistent unit markers
+	queue_redraw()
+
 
 func _animate_unit_deploy(screen_pos: Vector2, unit: Resource) -> void:
 	var deploy_visual = _UnitDeployVisual.new()
@@ -673,6 +732,9 @@ func _animate_unit_deploy(screen_pos: Vector2, unit: Resource) -> void:
 # === GROUND COMBAT PHASE ===
 
 func _execute_ground_combat_phase() -> void:
+	# Clear transport return queue
+	_transports_to_return.clear()
+
 	# Run ground combat until one side is eliminated or all attackers reach targets
 	var max_turns = 20  # Safety limit
 	var turn = 0
@@ -701,6 +763,9 @@ func _execute_ground_combat_phase() -> void:
 
 		await get_tree().create_timer(_action_delay).timeout
 
+	# Animate transports flying home (not targetable - just visual)
+	await _animate_transport_returns()
+
 
 func _count_alive_units(units: Array) -> int:
 	var count = 0
@@ -712,12 +777,12 @@ func _count_alive_units(units: Array) -> int:
 
 func _process_turret_attacks() -> void:
 	# Player turrets attack enemy ground units on player island
-	await _turrets_attack(player_placement, _enemy_deployed_units, player_grid_view)
+	await _turrets_attack(player_placement, _enemy_deployed_units, player_grid_view, "player")
 	# Enemy turrets attack player ground units on enemy island
-	await _turrets_attack(enemy_placement, _player_deployed_units, enemy_grid_view)
+	await _turrets_attack(enemy_placement, _player_deployed_units, enemy_grid_view, "enemy")
 
 
-func _turrets_attack(pm: PlacementManager, enemy_units: Array, grid_view: Control) -> void:
+func _turrets_attack(pm: PlacementManager, enemy_units: Array, grid_view: Control, side: String) -> void:
 	for structure in pm.get_structures():
 		if structure.is_destroyed or not structure.is_turret():
 			continue
@@ -725,6 +790,13 @@ func _turrets_attack(pm: PlacementManager, enemy_units: Array, grid_view: Contro
 		# Find enemy ground unit in range
 		var target_unit = _find_ground_unit_in_turret_range(structure, enemy_units)
 		if target_unit:
+			# Check and consume energy before attacking
+			var energy_cost = structure.energy_cost
+			if energy_cost > 0:
+				if not EconomyManager.can_spend_energy(side, energy_cost):
+					continue  # No energy to fire, skip
+				EconomyManager.spend_energy(side, energy_cost)
+
 			# Animate turret attack
 			var turret_pos = grid_view.global_position + grid_view.grid_to_screen_center(structure.grid_position)
 			var target_pos = grid_view.global_position + grid_view.grid_to_screen_center(target_unit.current_position)
@@ -863,6 +935,8 @@ func _animate_unit_move(grid_view: Control, from_grid: Vector2i, to_grid: Vector
 	add_child(move_visual)
 	await move_visual.finished
 	move_visual.queue_free()
+	# Redraw to update persistent unit markers
+	queue_redraw()
 
 
 func _process_ground_attacks() -> void:
@@ -958,8 +1032,11 @@ func _resolve_ground_damage() -> void:
 	_player_deployed_units = _player_deployed_units.filter(func(u): return not u.is_destroyed and u.is_deployed)
 	_enemy_deployed_units = _enemy_deployed_units.filter(func(u): return not u.is_destroyed and u.is_deployed)
 
+	# Redraw to update unit markers
+	queue_redraw()
 
-func _check_returned_units(units: Array, _is_player: bool) -> void:
+
+func _check_returned_units(units: Array, is_player: bool) -> void:
 	# Find units that are returning and have reached landing site
 	var returned_count: int = 0
 	var return_transport: Resource = null
@@ -975,10 +1052,14 @@ func _check_returned_units(units: Array, _is_player: bool) -> void:
 				# Reset unit state for reuse
 				unit.is_deployed = false
 				unit.is_returning = false
+				var landing_pos = unit.landing_position  # Save before clearing
 				unit.current_position = Vector2i(-1, -1)
 				unit.landing_position = Vector2i(-1, -1)
 				# Put back in transport
 				unit.source_transport.carried_units.append(unit)
+				# Queue transport for return flight animation (if not already queued)
+				if not _transports_to_return.has({"transport": unit.source_transport, "landing_pos": landing_pos, "is_player": is_player}):
+					_transports_to_return.append({"transport": unit.source_transport, "landing_pos": landing_pos, "is_player": is_player})
 			else:
 				# Transport destroyed, unit has nowhere to go - mark as lost
 				unit.is_destroyed = true
@@ -987,6 +1068,33 @@ func _check_returned_units(units: Array, _is_player: bool) -> void:
 
 	if returned_count > 0:
 		transport_returned.emit(return_transport, returned_count)
+
+
+func _animate_transport_returns() -> void:
+	# Animate each transport flying home (not targetable - purely visual)
+	for return_data in _transports_to_return:
+		var transport = return_data.transport
+		var landing_pos = return_data.landing_pos
+		var is_player = return_data.is_player
+
+		if transport.is_destroyed:
+			continue  # Transport was destroyed during ground combat
+
+		# Calculate positions - from landing zone back to transport's home base
+		var source_grid_view = enemy_grid_view if is_player else player_grid_view
+		var target_grid_view = player_grid_view if is_player else enemy_grid_view
+
+		var from_local = source_grid_view.grid_to_screen_center(landing_pos)
+		var from_pos = source_grid_view.global_position + from_local
+
+		var to_local = target_grid_view.grid_to_screen_center(transport.grid_position)
+		var to_pos = target_grid_view.global_position + to_local
+
+		# Animate the return flight
+		await _animate_transport(from_pos, to_pos, is_player)
+		await get_tree().create_timer(0.2).timeout
+
+	_transports_to_return.clear()
 
 
 # Inner class for explosion/miss visual
