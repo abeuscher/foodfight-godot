@@ -1,0 +1,11 @@
+Obseervations on the game prototype.
+
+Overall, the prototype of this game is a success. It is a good proof of concept that AI coding has advanced to the point where, at lerast at a low enouigh level fo ddielity, I can provide mostly non code related prompts and get back what is asked for without iteration or frustration. This was fun. And the gamew works from beginning to end.
+
+We are now going to enter the fine tuning phase of the game loop. What I would like to get out of the next phase is a sense that the game is fun to play at a very small scale with limited weaponms; I want a balanced game loop with the current fairly minimal set of weapons, and on a very small grid - like 8 x 8 would be ideal if we do 12 x 12 that is fine. 
+
+Here is why the game in its present format isn't fun:
+
+ - The targeting phase ends up being clunky as trhe game advances; it's a lot of overlapping arrows between tiny squares it is both hard and not fun to track. This could be fixed by only allowing the arrow of the currently active weapon to be visible. Or we could try that.
+ - The enemy petty much does the same thing every time and success is only predicated ont he percentage hit of their defense against our offense or whether one side has more weapons than the other to start. We want a situation in which weapons can be used to gain advantage in an asymmettrical situation if they are used cleverly, or conditions are correct, or whtever other factors we can introduce for there to be true strategy involved instead of only luck. We want a comnbination of the two for a good feedback loop.
+ - The gris being a blank square and weapons of defense having inginite scope seems wrong. Defense needs to be appropriately hard to set up and when set up it has to be beatable. Again - we need a situation in which an asymmetrical situation can be de-activated with better strategy or logic.

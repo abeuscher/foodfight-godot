@@ -235,141 +235,84 @@ Game phases: BASE_PLACEMENT → PLACEMENT → TARGETING → FIGHT
 
 ---
 
-## Phase 8: Ground Combat System [NOT STARTED]
+# Phase 8: Ground Combat System
 
-**Goal:** Add transport units, ground troops, and ground-based defense creating a second combat layer.
+## Overview
 
-### Reference Behavior
-The game being mimicked features:
-- Transport units carry ground troops across the canal to the enemy island
-- Ground troops act autonomously to destroy enemy installations
-- Ground defense units (stationary or mobile) defend against invading troops
-- This creates tension between air superiority (missiles) and ground control
+Ground combat adds a second front to the battle. Players can load troops into transports, send them to the enemy island, and attack structures within a limited operation range. Surviving units return to the transport for reuse next turn.
 
-### Step 8.1: Transport Unit
-Create `TRANSPORT` structure type:
-- Cost: $25
+## Structures
+
+### Transport ($25)
 - HP: 5
 - Capacity: 3 ground units
-- Behavior: During FIGHT phase, travels across canal to enemy island
-- Can be intercepted by defensive missiles (uses normal intercept chance)
-- If destroyed, all carried units are lost
-- If arrives, deploys carried units at landing zone
+- Must be loaded with units during PLACEMENT phase
+- Must be targeted to a landing zone during TARGETING phase
+- 10% interception chance (harder to hit than missiles)
+- Cannot land on squares containing structures
 
-**Test:** `test_transport.gd`
-- [ ] Transport can be placed on player grid
-- [ ] Transport stores reference to carried units
-- [ ] Transport can be targeted by enemy defenses
-- [ ] Transport destruction destroys carried units
-- [ ] Successful landing deploys units
-
-### Step 8.2: Ground Unit Base Class
-Create `GroundUnit` resource extending from base unit concept:
-- Properties: `unit_type`, `health`, `max_health`, `attack_damage`, `movement_speed`, `attack_range`
-- State: `current_position`, `target_structure`, `is_deployed`
-- Ground units exist on the enemy's island after transport landing
-
-**Test:** `test_ground_unit.gd`
-- [ ] Ground unit initializes with correct stats
-- [ ] Ground unit tracks position on enemy grid
-- [ ] Ground unit can acquire targets
-- [ ] Ground unit can take damage and be destroyed
-
-### Step 8.3: Infantry Unit
-Basic attacking ground unit:
-- Cost: $5 (loaded into transport)
-- HP: 3
-- Attack: 1 damage per turn to adjacent structures
-- Movement: 1 cell per turn
-- Behavior: Move toward nearest enemy structure, attack when adjacent
-- Priority targets: Radar > Defensive > Offensive > Economic > Base
-
-**Test:** `test_infantry.gd`
-- [ ] Infantry moves toward nearest target
-- [ ] Infantry attacks adjacent structures
-- [ ] Infantry follows target priority
-- [ ] Infantry pathfinding avoids obstacles
-
-### Step 8.4: Demolition Unit
-Specialized anti-structure ground unit:
-- Cost: $10
-- HP: 2 (fragile)
-- Attack: 3 damage (one-time explosion, destroys self)
-- Movement: 2 cells per turn (fast)
-- Behavior: Rush to highest-value target, detonate on arrival
-- Priority targets: Base > Radar > Economic > Defensive > Offensive
-
-**Test:** `test_demolition.gd`
-- [ ] Demolition unit moves 2 cells per turn
-- [ ] Demolition unit self-destructs on attack
-- [ ] Attack deals 3 damage
-- [ ] Follows correct target priority
-
-### Step 8.5: Stationary Ground Defense - Turret
-Ground-based defensive structure:
-- Cost: $10
+### Turret ($10)
 - HP: 5
-- Attack: 1 damage to ground units within 2-cell range
-- Behavior: Automatically targets and fires at enemy ground units each turn
-- Cannot move, cannot attack structures or missiles
+- Range: 2 cells
+- Automatically attacks enemy ground units within range each turn
+- Does not move; purely defensive
 
-**Test:** `test_turret.gd`
-- [ ] Turret attacks ground units in range
-- [ ] Turret ignores missiles and structures
-- [ ] Turret fires once per turn
-- [ ] Turret prioritizes closest enemy
+## Ground Units
 
-### Step 8.6: Mobile Ground Defense - Patrol Unit
-Mobile defensive ground unit:
-- Cost: $15
-- HP: 4
-- Attack: 1 damage to adjacent ground units
-- Movement: 1 cell per turn
-- Behavior: Patrols between two points OR pursues nearest enemy ground unit
-- Mode toggle: Patrol vs. Pursue (set during placement)
+| Unit | Cost | HP | Damage | Speed | Behavior |
+|------|------|-----|--------|-------|----------|
+| Infantry | $5 | 3 | 1 | 1 cell/turn | Attacks structures; priority: Radar > Defensive > Offensive > Economic > Base |
+| Demolition | $10 | 2 | 3 | 2 cells/turn | Suicide unit - destroys self on attack; priority: Base > Radar > Economic |
+| Patrol | $15 | 4 | 1 | 1 cell/turn | Defender - targets enemy ground units, not structures |
 
-**Test:** `test_patrol_unit.gd`
-- [ ] Patrol unit moves along patrol path
-- [ ] Patrol unit switches to pursuit when enemy detected
-- [ ] Patrol unit attacks adjacent enemies
-- [ ] Patrol unit returns to patrol after enemy eliminated
+## Controls
 
-### Step 8.7: Ground Combat Resolution
-Integrate ground combat into FIGHT phase:
-1. Missiles fire and resolve (existing system)
-2. Transports travel (can be intercepted)
-3. Surviving transports deploy units
-4. Ground units act in initiative order:
-   - All ground units move simultaneously
-   - All ground units attack simultaneously
-   - Resolve damage after all attacks
-5. Repeat ground unit phase until:
-   - All attacking ground units destroyed, OR
-   - All defending ground units destroyed AND attackers reach targets
+### Placement Phase
+1. Click **Transport** button, place on your island
+2. Click placed transport to open loading panel
+3. Load up to 3 units (Infantry, Demolition, Patrol)
+4. **Undo** removes last loaded unit and refunds cost
 
-**Test:** `test_ground_combat_flow.gd`
-- [ ] Ground phase occurs after missile phase
-- [ ] Units move before attacking
-- [ ] Damage resolves after all attacks
-- [ ] Ground combat ends correctly
+### Targeting Phase
+1. Click a loaded transport to select it
+2. Click an **empty** cell on enemy island to set landing zone
+3. Targeting line shows where transport will land
 
-### Step 8.8: Transport Loading UI
-Allow player to load units into transports:
-- Select transport during PLACEMENT phase
-- Choose units to load (up to capacity)
-- Visual indicator showing transport contents
-- Cost of loaded units paid on loading
+## Combat Flow
 
-**Test:** `test_transport_loading.gd`
-- [ ] Player can select transport
-- [ ] Player can add units up to capacity
-- [ ] Cannot exceed capacity
-- [ ] Unit cost deducted on load
-- [ ] Units removed from available pool
+During FIGHT phase:
+1. Missiles fire (existing system)
+2. Transports travel to landing zones
+   - Can be intercepted (10% chance)
+   - If intercepted, all carried units are lost
+3. Surviving transports deploy units at landing zone
+4. Ground combat runs in turns:
+   - Turrets fire at enemy ground units in range
+   - All units move toward targets
+   - All units attack adjacent targets
+   - Damage resolves
 
-**[ENGAGE] Checkpoint 8.8:** Load a transport with infantry, send it across. Does the transport journey feel tense? Is it satisfying when units deploy? Does ground combat feel like a meaningful second front?
+## Operation Range
 
----
+Units can only operate within a **7x7 area** (3 cells in any direction) from their landing site:
+- Units will not pursue targets outside this range
+- When no valid targets remain in range, units return to landing site
+- Returned units are reloaded into the transport for next turn
+
+## Fog of War
+
+Ground units reveal fog as they move:
+- 3x3 area revealed on deployment
+- 3x3 area revealed each time a unit moves
+
+## Unit Persistence
+
+- Units stay in transport between turns until launched
+- Surviving units that return are reloaded into transport
+- Transport can be targeted again next turn with surviving units
+- If transport is destroyed, returning units are lost
+
+ ---
 
 ## Phase 9: Balance Refinement [NOT STARTED]
 
